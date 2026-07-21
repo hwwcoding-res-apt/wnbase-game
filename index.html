@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MICROGAME RUSH</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body { height: 100%; background: #111; overflow: hidden; font-family: 'Arial Black', Arial, sans-serif; }
+  #app { position: relative; width: 100%; height: 100%; }
+
+  #stage {
+    position: absolute; inset: 0; background: #f4f0e6;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0; display: flex;
+    justify-content: space-between; padding: 14px 18px; z-index: 50;
+    pointer-events: none; font-weight: 900; color: #222; font-size: 18px;
+    text-shadow: 0 1px 0 #fff;
+  }
+  #lives span { color: #d8324a; font-size: 22px; margin-left: 2px; }
+  #timerWrap {
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 10px; background: #ccc; border: 2px solid #222; border-radius: 6px;
+    overflow: hidden; z-index: 50;
+  }
+  #timerBar { height: 100%; width: 100%; background: #2ea043; transition: width 0.05s linear, background 0.3s; }
+
+  #commandOverlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    z-index: 100; background: #111; pointer-events: none;
+  }
+  #commandText {
+    font-size: 15vw; color: #fff; font-weight: 900; letter-spacing: 2px;
+    text-shadow: 4px 4px 0 #d8324a;
+    transform: scale(0.3) rotate(-6deg); opacity: 0;
+  }
+  @keyframes slamIn {
+    0% { transform: scale(2.4) rotate(-6deg); opacity: 0; }
+    55% { transform: scale(0.85) rotate(2deg); opacity: 1; }
+    75% { transform: scale(1.05) rotate(-1deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .slam { animation: slamIn 0.32s cubic-bezier(.2,1.4,.4,1) forwards; }
+
+  @keyframes shakeScreen {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-8px,4px); }
+    40% { transform: translate(8px,-4px); }
+    60% { transform: translate(-6px,-4px); }
+    80% { transform: translate(6px,4px); }
+  }
+  .shake { animation: shakeScreen 0.32s ease; }
+
+  #flash {
+    position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 200;
+  }
+  @keyframes flashPop { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+  .flashing { animation: flashPop 0.25s ease-out; }
+
+  #resultBanner {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    z-index: 150; pointer-events: none; opacity: 0;
+  }
+  #resultBanner.show { opacity: 1; }
+  #resultBanner span {
+    font-size: 10vw; font-weight: 900; padding: 10px 30px; border-radius: 10px;
+    color: #fff; text-shadow: 3px 3px 0 rgba(0,0,0,0.25);
+  }
+  .success-banner { background: #2ea043cc; }
+  .fail-banner { background: #d8324acc; }
+
+  #centerMenu {
+    position: absolute; inset: 0; z-index: 300; background: #111;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center;
+    gap: 14px;
+  }
+  #centerMenu h1 { font-size: 42px; color: #ffd23f; text-shadow: 3px 3px 0 #d8324a; letter-spacing: 1px; }
+  #centerMenu p { color: #aaa; font-size: 14px; max-width: 320px; line-height: 1.5; }
+  .bigBtn {
+    background: #ffd23f; color: #222; border: none; padding: 14px 34px; font-size: 20px;
+    font-weight: 900; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 0 #b58f1a;
+  }
+  .bigBtn:active { transform: translateY(4px); box-shadow: none; }
+  #statLine { font-size: 15px; color: #ddd; }
+
+  /* --- shared microgame styles --- */
+  .mg-wrap { width: 100%; height: 100%; position: relative; }
+  .mg-prompt {
+    position: absolute; top: 8%; left: 50%; transform: translateX(-50%);
+    font-size: 26px; font-weight: 900; color: #222; text-align: center; z-index: 10; width: 90%;
+  }
+  .grid4 {
+    position: absolute; top: 26%; left: 50%; transform: translateX(-50%);
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 4vmin; width: 60vmin; height: 60vmin; max-width: 80vw; max-height: 65vh;
+  }
+  .sq {
+    border-radius: 14px; cursor: pointer; border: 4px solid #222; width: 100%; height: 100%;
+  }
+  .glow { box-shadow: 0 0 0 6px #fff, 0 0 30px 10px #ffd23f inset; animation: pulse 0.4s infinite alternate; }
+  @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.5); } }
+  .cursorSel { outline: 6px dashed #2a63d8; outline-offset: -6px; }
+  #gridHint { position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 900; color: #555; z-index: 10; }
+
+  #dodgeArena { position: absolute; inset: 0; background: #dfe9f3; }
+  #dodgePlayer { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; }
+  .projectile { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #d8324a; border: 3px solid #6e0f1e; }
+
+  #typeWord { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%); font-size: 48px; font-weight: 900; letter-spacing: 4px; color: #222; }
+  #typeInput {
+    position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%);
+    font-size: 24px; padding: 8px 16px; border: 4px solid #222; border-radius: 8px; width: 60%; text-align: center;
+  }
+  .typedCorrect { color: #2ea043; }
+  .typedWrong { color: #d8324a; }
+
+  #mashBarWrap { position: absolute; top: 45%; left: 10%; right: 10%; height: 40px; background: #ccc; border: 4px solid #222; border-radius: 20px; overflow: hidden; }
+  #mashBarFill { height: 100%; width: 0%; background: #ffd23f; transition: background 0.2s; }
+  #mashRival { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 900; color: #d8324a; }
+  #mashBtn {
+    position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
+    font-size: 26px; font-weight: 900; padding: 18px 40px; border-radius: 12px;
+    background: #2a63d8; color: #fff; border: 4px solid #123a80; cursor: pointer;
+  }
+
+  .coinField { position: absolute; inset: 0; }
+  .coinItem {
+    position: absolute; width: 60px; height: 60px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 30px; cursor: pointer;
+    background: #ffd23f; border: 4px solid #b58f1a; transition: transform 0.1s;
+  }
+  .coinItem.bomb { background: #333; border-color: #111; }
+  .coinItem.collected { transform: scale(0); pointer-events: none; }
+  .coinItem:active { transform: scale(0.9); }
+
+  #creeperArena { position: absolute; inset: 0; background: #1b2b1b; }
+  #creeperPlayer { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; z-index: 5; }
+  #creeperEnemy { position: absolute; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 34px; z-index: 5; }
+  .creeperEnemy2 { position: absolute; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 30px; z-index: 5; }
+
+  #catchArena { position: absolute; inset: 0; background: #cfe8ff; }
+  #catchBasket { position: absolute; bottom: 12%; font-size: 42px; transform: translateX(-50%); }
+  .fallItem { position: absolute; font-size: 28px; transform: translateX(-50%); }
+  #catchCount { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 900; color: #222; z-index: 10; }
+
+  #reactionArrow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 18vmin; }
+
+  #mathEq { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%); font-size: 52px; font-weight: 900; color: #222; }
+  #mathOpts { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
+  .mathOptBtn { font-size: 28px; font-weight: 900; padding: 14px 26px; border-radius: 10px; border: 4px solid #222; background: #fff; cursor: pointer; }
+
+  #dontBtn {
+    position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%) scale(1);
+    font-weight: 900; padding: 24px 46px; border-radius: 14px;
+    background: #2ea043; color: #fff; border: 5px solid #123a1e; cursor: pointer;
+    transition: left 0.5s ease, top 0.5s ease, transform 0.15s ease, background 0.2s, font-size 0.2s;
+  }
+  @keyframes beg {
+    0%,100% { transform: translate(-50%,-50%) scale(1); }
+    50% { transform: translate(-50%,-50%) scale(1.12); }
+  }
+  .begging { animation: beg 0.5s infinite; }
+
+  .diffGrid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 4vmin; }
+  .diffBoard { display: grid; grid-template-columns: repeat(7,1fr); grid-template-rows: repeat(7,1fr); gap: 3px; width: 68vmin; height: 68vmin; max-width: 88vw; max-height: 68vh; }
+  .diffCell { border-radius: 6px; }
+
+  #streakToast {
+    position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+    font-size: 34px; font-weight: 900; color: #ffd23f; text-shadow: 3px 3px 0 #d8324a;
+    opacity: 0; z-index: 250;
+  }
+  @keyframes toastPop {
+    0% { opacity: 0; transform: translate(-50%, 10px) scale(0.7); }
+    20% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+    35% { transform: translate(-50%, 0) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -20px) scale(1); }
+  }
+  .toastShow { animation: toastPop 1.1s ease forwards; }
+
+  /* --- stop the bar --- */
+  #gaugeWrap { position: absolute; top: 42%; left: 10%; right: 10%; height: 50px; background: #ccc; border: 4px solid #222; border-radius: 10px; overflow: hidden; }
+  #gaugeZone { position: absolute; top: 0; bottom: 0; background: #2ea043; }
+  #gaugeMarker { position: absolute; top: -6px; bottom: -6px; width: 8px; background: #222; }
+  #gaugeHint { position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 900; color: #555; }
+
+  /* --- simon flash --- */
+  .simonGrid { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 4vmin; width: 60vmin; height: 60vmin; max-width: 80vw; max-height: 60vh; }
+  .simonTile { border-radius: 14px; border: 4px solid #222; cursor: pointer; filter: brightness(0.55); transition: filter 0.15s; }
+  .simonTile.lit { filter: brightness(1.5); box-shadow: 0 0 30px 10px #fff inset; }
+
+  /* --- balance it --- */
+  #balancePlatform { position: absolute; top: 45%; left: 50%; width: 62vmin; height: 14px; background: #5a3a1e; border-radius: 8px; transform-origin: center; }
+  #balanceDot { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; }
+  #balanceZone { position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%); width: 70px; height: 70px; border-radius: 50%; border: 3px dashed #2ea043; pointer-events: none; }
+
+  /* --- reaction time test --- */
+  #reactBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 22px; font-weight: 900; padding: 22px 44px; border-radius: 14px; background: #d8324a; color: #fff; border: 5px solid #6e0f1e; cursor: pointer; }
+  #reactWindowBar { position: absolute; top: 30%; left: 20%; right: 20%; height: 14px; background: #ccc; border: 3px solid #222; border-radius: 8px; overflow: hidden; }
+  #reactWindowFill { height: 100%; width: 100%; background: #ffd23f; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"></div>
+  <div id="flash"></div>
+  <div id="resultBanner"><span id="resultText"></span></div>
+  <div id="streakToast"></div>
+
+  <div id="hud" style="display:none;">
+    <div id="lives"></div>
+    <div id="levelLabel">LEVEL 1</div>
+  </div>
+  <div id="timerWrap" style="display:none;"><div id="timerBar"></div></div>
+
+  <div id="commandOverlay" style="display:none;"><div id="commandText"></div></div>
+
+  <div id="centerMenu">
+    <h1>MICROGAME RUSH!</h1>
+    <p>A word flashes. Then you've got seconds to survive the microgame. Fail three times and it's over. Speed ramps up every round.</p>
+    <div id="statLine"></div>
+    <button class="bigBtn" id="startBtn">START</button>
+    <button class="bigBtn" id="testModeBtn" style="background:#2a63d8;color:#fff;box-shadow:0 4px 0 #123a80;">TEST MODE</button>
+  </div>
+
+  <div id="testMenu" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:28px; color:#ffd23f; text-shadow:3px 3px 0 #d8324a;">TEST MODE</h1>
+    <p style="color:#aaa; font-size:13px; max-width:320px;">Pick a microgame to loop it on repeat. Adjust level to tune difficulty. Esc or Back to exit.</p>
+    <div id="testGameList" style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:420px;"></div>
+    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+      <button id="testLevelDown" class="bigBtn" style="padding:8px 16px; font-size:16px;">-</button>
+      <span id="testLevelLabel" style="font-size:16px; font-weight:900;">TEST LEVEL 1</span>
+      <button id="testLevelUp" class="bigBtn" style="padding:8px 16px; font-size:16px;">+</button>
+    </div>
+    <button class="bigBtn" id="testBackBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">BACK</button>
+  </div>
+
+  <div id="testHud" style="display:none; position:absolute; top:0; left:0; right:0; z-index:60; justify-content:space-between; align-items:center; padding:12px 18px; pointer-events:none;">
+    <span style="font-weight:900; color:#2a63d8; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #123a80;">TEST: <span id="testGameName"></span></span>
+    <span style="font-weight:900; color:#222; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #222; pointer-events:auto; cursor:pointer;" id="testExitBtn">EXIT (ESC)</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const hud = document.getElementById('hud');
+  const livesEl = document.getElementById('lives');
+  const levelLabel = document.getElementById('levelLabel');
+  const timerWrap = document.getElementById('timerWrap');
+  const timerBar = document.getElementById('timerBar');
+  const commandOverlay = document.getElementById('commandOverlay');
+  const commandText = document.getElementById('commandText');
+  const flash = document.getElementById('flash');
+  const resultBanner = document.getElementById('resultBanner');
+  const resultText = document.getElementById('resultText');
+  const centerMenu = document.getElementById('centerMenu');
+  const startBtn = document.getElementById('startBtn');
+  const statLine = document.getElementById('statLine');
+  const streakToast = document.getElementById('streakToast');
+  const app = document.getElementById('app');
+  const testModeBtn = document.getElementById('testModeBtn');
+  const testMenu = document.getElementById('testMenu');
+  const testGameList = document.getElementById('testGameList');
+  const testBackBtn = document.getElementById('testBackBtn');
+  const testLevelUp = document.getElementById('testLevelUp');
+  const testLevelDown = document.getElementById('testLevelDown');
+  const testLevelLabel = document.getElementById('testLevelLabel');
+  const testHud = document.getElementById('testHud');
+  const testGameName = document.getElementById('testGameName');
+  const testExitBtn = document.getElementById('testExitBtn');
+  let testMode = false, testLevel = 1, testEntry = null, testEscHandler = null;
+
+  let bestStreak = 0;
+  let lastGameName = null;
+  let lives, level, streak, roundActive, timeoutHandle, rafHandle, currentCleanup, keyHandler;
+
+  statLine.textContent = 'Best streak: ' + bestStreak;
+
+  function rand(min, max) { return Math.random() * (max - min) + min; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function vibScreen() {
+    app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
+  }
+  function doFlash() {
+    flash.classList.remove('flashing'); void flash.offsetWidth; flash.classList.add('flashing');
+  }
+
+  // ---------- SHARED: arrow-key grid navigation ----------
+  // cells: array of DOM elements in row-major order. cols: grid width.
+  // confirmCb(index) is called when Space is pressed on the current cell.
+  function attachArrowGridNav(cells, cols, confirmCb) {
+    let idx = 0;
+    const rowsTotal = Math.ceil(cells.length / cols);
+    function highlight() {
+      cells.forEach((c,i) => c.classList.toggle('cursorSel', i === idx));
+    }
+    highlight();
+    const kh = (e) => {
+      const isNav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key);
+      const isConfirm = e.code === 'Space';
+      if (!isNav && !isConfirm) return;
+      e.preventDefault();
+      if (isConfirm) { confirmCb(idx); return; }
+      const row = Math.floor(idx/cols), col = idx%cols;
+      if (e.key === 'ArrowLeft') idx = row*cols + Math.max(0, col-1);
+      else if (e.key === 'ArrowRight') idx = row*cols + Math.min(cols-1, col+1);
+      else if (e.key === 'ArrowUp') idx = Math.max(0, row-1)*cols + col;
+      else if (e.key === 'ArrowDown') idx = Math.min(rowsTotal-1, row+1)*cols + col;
+      idx = Math.max(0, Math.min(cells.length-1, idx));
+      highlight();
+    };
+    window.addEventListener('keydown', kh);
+    return () => window.removeEventListener('keydown', kh);
+  }
+
+  // ---------- MICROGAME DEFINITIONS ----------
+  // Each returns { init(container, duration, onResult), cleanup() }
+
+  function colorClickGame() {
+    let container, onResult, done = false, detachNav;
+    const colors = ['#d8324a', '#2a63d8', '#ffd23f', '#2ea043'];
+    function init(c, duration, cb) {
+      container = c; onResult = cb; done = false;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CLICK THE GLOWING ONE!</div><div class="grid4" id="g4"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      const g4 = c.querySelector('#g4');
+      const targetIdx = Math.floor(Math.random()*4);
+      const cells = colors.map((col, i) => {
+        const sq = document.createElement('div');
+        sq.className = 'sq' + (i===targetIdx ? ' glow' : '');
+        sq.style.background = col;
+        sq.addEventListener('click', () => select(i));
+        g4.appendChild(sq);
+        return sq;
+      });
+      function select(i) {
+        if (done) return; done = true;
+        onResult(i === targetIdx);
+      }
+      detachNav = attachArrowGridNav(cells, 2, select);
+    }
+    function cleanup() { done = true; if (detachNav) detachNav(); }
+    return { init, cleanup };
+  }
+
+  function dodgeGame(reskin) {
+    let container, onResult, done, player, px, py, keys, arena, projectiles, spawnTimer, raf, w, h;
+    const themes = reskin || [
+      { label: 'DODGE THE BLOBS!', bg:'#dfe9f3', proj:'#d8324a' },
+      { label: 'DODGE THE FIREBALLS!', bg:'#3a2418', proj:'#ff8c1a' },
+      { label: 'DODGE THE CREEPERS!', bg:'#dcecd6', proj:'#3fae4a' }
+    ];
+    function init(c, duration, cb, level) {
+      container = c; onResult = cb; done = false;
+      level = level || 1;
+      const theme = pick(themes);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">'+theme.label+'</div><div id="dodgeArena"></div><div id="dodgePlayer"></div></div>';
+      arena = c.querySelector('#dodgeArena');
+      arena.style.background = theme.bg;
+      player = c.querySelector('#dodgePlayer');
+      w = c.clientWidth; h = c.clientHeight;
+      px = w/2; py = h*0.65;
+      keys = {};
+      projectiles = [];
+      keyHandler = (e) => {
+        if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s'].includes(e.key)) e.preventDefault();
+        keys[e.key] = (e.type === 'keydown');
+      };
+      window.addEventListener('keydown', keyHandler);
+      window.addEventListener('keyup', keyHandler);
+
+      const spawnInterval = Math.max(85, 260 - level*16);
+      const speedMin = 190 + level*18;
+      const speedMax = 320 + level*24;
+
+      spawnTimer = setInterval(() => {
+        if (done) return;
+        const fromLeft = Math.random() < 0.5;
+        const y = rand(h*0.15, h*0.9);
+        const el = document.createElement('div');
+        el.className = 'projectile';
+        el.style.background = theme.proj;
+        el.style.top = y+'px';
+        el.style.left = (fromLeft ? -30 : w+30) + 'px';
+        arena.appendChild(el);
+        projectiles.push({ el, x: fromLeft ? -30 : w+30, y, vx: (fromLeft?1:-1) * rand(speedMin,speedMax) });
+      }, spawnInterval);
+
+      let last = performance.now();
+      function loop(t) {
+        if (done) return;
+        const dt = Math.min(0.05, (t-last)/1000); last = t;
+        const speed = 260;
+        if (keys['ArrowLeft']||keys['a']) px -= speed*dt;
+        if (keys['ArrowRight']||keys['d']) px += speed*dt;
+        if (keys['ArrowUp']||keys['w']) py -= speed*dt;
+        if (keys['ArrowDown']||keys['s']) py += speed*dt;
+        px = Math.max(10, Math.min(w-40, px));
+        py = Math.max(10, Math.min(h-40, py));
+        player.style.left = px+'px'; player.style.top = py+'px';
+
+        for (const p of projectiles) {
+          p.x += p.vx*dt;
+          p.el.style.left = p.x+'px';
+          const dx = (p.x+13)-(px+17), dy = (p.y+13)-(py+17);
+          if (Math.sqrt(dx*dx+dy*dy) < 26) { done = true; onResult(false); return; }
+        }
+        projectiles = projectiles.filter(p => p.x > -60 && p.x < w+60);
+        raf = requestAnimationFrame(loop);
+      }
+      raf = requestAnimationFrame(loop);
+
+      // succeed handled externally via timeout in main loop (onTimeout)
+      init._succeedFn = () => { if (!done) { done = true; onResult(true); } };
+    }
+    function cleanup() {
+      done = true;
+      clearInterval(spawnTimer);
+      cancelAnimationFrame(raf);
+      if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
+    }
+    return { init, cleanup, get onTimeoutSuccess() { return true; } };
+  }
+
+  function typeGame() {
+    let container, onResult, done, input;
+    const words = ['JUMP','QUICK','ZEBRA','PANIC','GLYPH','FUZZY','VIVID','CRISP','MICRO','WARIO'];
+    function init(c, duration, cb) {
+      container = c; onResult = cb; done = false;
+      const word = pick(words);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">TYPE THE WORD!</div><div id="typeWord">'+word+'</div><input id="typeInput" autocomplete="off" spellcheck="false" /></div>';
+      input = c.querySelector('#typeInput');
+      setTimeout(() => input.focus(), 10);
+      input.addEventListener('input', () => {
+        if (done) return;
+        const val = input.value.toUpperCase();
+        if (val === word) { done = true; onResult(true); }
+      });
+    }
+    function cleanup() { done = true; }
+    return { init, cleanup };
+  }
+
+  function mashGame() {
+    let container, onResult, done, fill, pct, keyH, pressedKeys, decayTimer, lastPress;
+    function init(c, duration, cb, level) {
+      container = c; onResult = cb; done = false; pct = 20; pressedKeys = new Set();
+      level = level || 1;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">MASH ANY KEY! DON\'T LET GO!</div><div id="mashRival">RIVAL IS PULLING BACK!</div><div id="mashBarWrap"><div id="mashBarFill"></div></div><div id="mashBtn">MASH!</div></div>';
+      fill = c.querySelector('#mashBarFill');
+      fill.style.width = pct + '%';
+      const btn = c.querySelector('#mashBtn');
+
+      function render() {
+        fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+        fill.style.background = pct > 66 ? '#2ea043' : pct > 33 ? '#ffd23f' : '#d8324a';
+      }
+      function bump() {
+        if (done) return;
+        pct = Math.min(100, pct + 6);
+        render();
+        if (pct >= 100) { done = true; onResult(true); }
+      }
+      btn.addEventListener('click', bump);
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); bump(); });
+      keyH = (e) => {
+        if (e.type === 'keydown') {
+          e.preventDefault();
+          if (!pressedKeys.has(e.code)) { pressedKeys.add(e.code); bump(); }
+        } else if (e.type === 'keyup') {
+          pressedKeys.delete(e.code);
+        }
+      };
+      window.addEventListener('keydown', keyH);
+      window.addEventListener('keyup', keyH);
+      keyHandler = keyH;
+
+      // decay ramps up with level so you can't just tap once and coast
+      const decayPerSec = 9 + level * 1.4;
+      let last = performance.now();
+      decayTimer = setInterval(() => {
+        if (done) return;
+        pct = Math.max(0, pct - decayPerSec * 0.1);
+        render();
+        if (pct <= 0) { done = true; onResult(false); }
+      }, 100);
+    }
+    function cleanup() {
+      done = true;
+      clearInterval(decayTimer);
+      if (keyH) { window.removeEventListener('keydown', keyH); window.removeEventListener('keyup', keyH); }
+    }
+    return { init, cleanup };
+  }
+
+  function avoidCreeperGame() {
+    let container, onResult, done, player, px, py, keys, raf, w, h, enemies;
+    function init(c, duration, cb, level) {
+      container = c; onResult = cb; done = false;
+      level = level || 1;
+      const secondCreeper = level >= 4;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">RUN FROM THE CREEPER'+(secondCreeper?'S':'')+'! (WASD/Arrows)</div><div id="creeperArena"></div><div id="creeperPlayer"></div></div>';
+      const arena = c.querySelector('#creeperArena');
+      player = c.querySelector('#creeperPlayer');
+      w = c.clientWidth; h = c.clientHeight;
+      px = w*0.3; py = h*0.6;
+
+      enemies = [{ x: w*0.7, y: h*0.3, el: document.createElement('div') }];
+      enemies[0].el.id = 'creeperEnemy';
+      enemies[0].el.textContent = '👹';
+      arena.appendChild(enemies[0].el);
+      if (secondCreeper) {
+        const e2 = { x: w*0.2, y: h*0.75, el: document.createElement('div') };
+        e2.el.className = 'creeperEnemy2';
+        e2.el.textContent = '🧟';
+        arena.appendChild(e2.el);
+        enemies.push(e2);
+      }
+
+      keys = {};
+      keyHandler = (e) => {
+        if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s'].includes(e.key)) e.preventDefault();
+        keys[e.key] = (e.type === 'keydown');
+      };
+      window.addEventListener('keydown', keyHandler);
+      window.addEventListener('keyup', keyHandler);
+
+      const speed = 260; // player movement speed
+      const baseSpeed = 90 + level*7;
+      const start = performance.now();
+      let last = start;
+      function loop(t) {
+        if (done) return;
+        const dt = Math.min(0.05, (t-last)/1000); last = t;
+        const elapsed = (t - start) / 1000;
+        // speed ramps up through the round but is always capped below the
+        // player's own speed -- a pursuer that's ever faster than the player
+        // can corner them for a guaranteed catch, which isn't a fair fail.
+        // Staying under player speed keeps evasion always mathematically
+        // possible (just harder to execute) at every level.
+        const rampFactor = 1 + Math.min(0.4, elapsed * 0.14);
+        const enemySpeed = Math.min(baseSpeed * rampFactor, speed * 0.86);
+
+        if (keys['ArrowLeft']||keys['a']) px -= speed*dt;
+        if (keys['ArrowRight']||keys['d']) px += speed*dt;
+        if (keys['ArrowUp']||keys['w']) py -= speed*dt;
+        if (keys['ArrowDown']||keys['s']) py += speed*dt;
+        px = Math.max(10, Math.min(w-40, px));
+        py = Math.max(10, Math.min(h-40, py));
+        player.style.left = px+'px'; player.style.top = py+'px';
+
+        for (const en of enemies) {
+          const dx = px-en.x, dy = py-en.y;
+          const dist = Math.hypot(dx,dy) || 1;
+          en.x += (dx/dist)*enemySpeed*dt;
+          en.y += (dy/dist)*enemySpeed*dt;
+          en.x = Math.max(0, Math.min(w-44, en.x));
+          en.y = Math.max(0, Math.min(h-44, en.y));
+          en.el.style.left = en.x+'px'; en.el.style.top = en.y+'px';
+          if (dist < 34) { done = true; onResult(false); return; }
+        }
+        raf = requestAnimationFrame(loop);
+      }
+      raf = requestAnimationFrame(loop);
+      init._succeedFn = () => { if (!done) { done = true; onResult(true); } };
+    }
+    function cleanup() {
+      done = true;
+      cancelAnimationFrame(raf);
+      if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
+    }
+    return { init, cleanup, get onTimeoutSuccess() { return true; } };
+  }
+
+  function catchGame() {
+    let container, onResult, done, basket, bx, keys, raf, arena, coin, w, h;
+    function init(c, duration, cb, level) {
+      container = c; onResult = cb; done = false;
+      level = level || 1;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CATCH THE COIN! (←/→ or A/D)</div><div id="catchArena"></div><div id="catchBasket">🧺</div></div>';
+      arena = c.querySelector('#catchArena');
+      basket = c.querySelector('#catchBasket');
+      w = c.clientWidth; h = c.clientHeight;
+      bx = w/2;
+      basket.style.left = bx+'px';
+      keys = {};
+      keyHandler = (e) => {
+        if (['ArrowLeft','ArrowRight','a','d'].includes(e.key)) e.preventDefault();
+        keys[e.key] = (e.type === 'keydown');
+      };
+      window.addEventListener('keydown', keyHandler);
+      window.addEventListener('keyup', keyHandler);
+
+      const x = rand(30, w-30);
+      const el = document.createElement('div');
+      el.className = 'fallItem';
+      el.textContent = '🪙';
+      el.style.left = x+'px';
+      el.style.top = '-30px';
+      arena.appendChild(el);
+      coin = { el, x, y: -30, vy: rand(95, 130) + level*4 };
+
+      let last = performance.now();
+      function loop(t) {
+        if (done) return;
+        const dt = Math.min(0.05, (t-last)/1000); last = t;
+        const speed = 380;
+        if (keys['ArrowLeft']||keys['a']) bx -= speed*dt;
+        if (keys['ArrowRight']||keys['d']) bx += speed*dt;
+        bx = Math.max(20, Math.min(w-20, bx));
+        basket.style.left = bx+'px';
+
+        coin.y += coin.vy*dt;
+        coin.el.style.top = coin.y+'px';
+
+        if (coin.y > h*0.62 && Math.abs(coin.x-bx) < 55) {
+          done = true; onResult(true); return;
+        }
+        if (coin.y > h+40) {
+          done = true; onResult(false); return;
+        }
+        raf = requestAnimationFrame(loop);
+      }
+      raf = requestAnimationFrame(loop);
+    }
+    function cleanup() {
+      done = true;
+      cancelAnimationFrame(raf);
+      if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
+    }
+    return { init, cleanup };
+  }
+
+  function reactionArrowGame() {
+    let done, keyH;
+    const dirs = [
+      { key:'ArrowUp', alt:'w', symbol:'⬆️' },
+      { key:'ArrowDown', alt:'s', symbol:'⬇️' },
+      { key:'ArrowLeft', alt:'a', symbol:'⬅️' },
+      { key:'ArrowRight', alt:'d', symbol:'➡️' }
+    ];
+    function init(c, duration, cb) {
+      done = false;
+      const target = pick(dirs);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">PRESS THE MATCHING ARROW!</div><div id="reactionArrow">'+target.symbol+'</div></div>';
+      keyH = (e) => {
+        if (done) return;
+        if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(e.key)) return;
+        e.preventDefault();
+        done = true;
+        cb(e.key === target.key || e.key === target.alt);
+      };
+      window.addEventListener('keydown', keyH);
+      keyHandler = keyH;
+    }
+    function cleanup() {
+      done = true;
+      if (keyH) window.removeEventListener('keydown', keyH);
+    }
+    return { init, cleanup };
+  }
+
+  function quickMathGame() {
+    let done, detachNav;
+    function init(c, duration, cb, level) {
+      done = false;
+      level = level || 1;
+      const maxNum = 8 + level*2;
+      const a = Math.floor(rand(2, maxNum));
+      const b = Math.floor(rand(1, maxNum));
+      const op = pick(['+','-']);
+      const answer = op === '+' ? a+b : a-b;
+      const opts = new Set([answer]);
+      let guard = 0;
+      while (opts.size < 3 && guard < 20) {
+        guard++;
+        const delta = Math.floor(rand(-5,5)) || 1;
+        opts.add(answer + delta);
+      }
+      const arr = [...opts].sort(() => Math.random()-0.5);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">SOLVE IT FAST!</div><div id="mathEq">'+a+' '+op+' '+b+' = ?</div><div id="mathOpts"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      const optsEl = c.querySelector('#mathOpts');
+      const btns = arr.map(val => {
+        const btn = document.createElement('button');
+        btn.className = 'mathOptBtn';
+        btn.textContent = val;
+        btn.addEventListener('click', () => select(val));
+        optsEl.appendChild(btn);
+        return btn;
+      });
+      function select(val) {
+        if (done) return; done = true;
+        cb(val === answer);
+      }
+      detachNav = attachArrowGridNav(btns, btns.length, (idx) => select(arr[idx]));
+    }
+    function cleanup() { done = true; if (detachNav) detachNav(); }
+    return { init, cleanup };
+  }
+
+  function spotDiffGame() {
+    let container, onResult, done, detachNav;
+    function init(c, duration, cb) {
+      container = c; onResult = cb; done = false;
+      const cells = 49;
+      const baseHue = Math.floor(rand(0,360));
+      const baseSat = 55, baseLight = 52;
+      const color = `hsl(${baseHue},${baseSat}%,${baseLight}%)`;
+      const diffMode = Math.random() < 0.5 ? 'light' : 'hue';
+      const diffColor = diffMode === 'light'
+        ? `hsl(${baseHue},${baseSat}%,${baseLight + (Math.random()<0.5?-9:9)}%)`
+        : `hsl(${(baseHue+18)%360},${baseSat}%,${baseLight}%)`;
+      const diffIdx = Math.floor(Math.random()*cells);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">FIND THE ODD ONE OUT!</div><div class="diffGrid"><div class="diffBoard" id="board"></div></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      const board = c.querySelector('#board');
+      const cellEls = [];
+      for (let i=0;i<cells;i++) {
+        const cell = document.createElement('div');
+        cell.className = 'diffCell';
+        cell.style.background = (i===diffIdx) ? diffColor : color;
+        cell.addEventListener('click', () => select(i));
+        board.appendChild(cell);
+        cellEls.push(cell);
+      }
+      function select(i) {
+        if (done) return; done = true;
+        onResult(i === diffIdx);
+      }
+      detachNav = attachArrowGridNav(cellEls, 7, select);
+    }
+    function cleanup() { done = true; if (detachNav) detachNav(); }
+    return { init, cleanup };
+  }
+
+  function stopBarGame() {
+    let done, raf, keyH, clickH, w, zoneX, zoneWidth, pos, dir, speed, gaugeEl, markerEl, zoneEl;
+    function init(c, duration, cb, level) {
+      done = false;
+      level = level || 1;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">STOP IT IN THE GREEN!</div><div id="gaugeWrap"><div id="gaugeZone"></div><div id="gaugeMarker"></div></div><div id="gaugeHint">PRESS SPACE (OR TAP)</div></div>';
+      gaugeEl = c.querySelector('#gaugeWrap');
+      zoneEl = c.querySelector('#gaugeZone');
+      markerEl = c.querySelector('#gaugeMarker');
+      w = gaugeEl.clientWidth;
+      speed = 220 + level*30;
+      // Guarantee the marker spends at least ~200ms inside the zone (human press
+      // reaction/precision floor) no matter how fast it's moving, so every level
+      // stays physically beatable rather than becoming a coinflip.
+      const minCrossSec = 0.2;
+      zoneWidth = Math.min(w*0.4, Math.max(speed*minCrossSec, w*0.09));
+      zoneX = rand(0, w - zoneWidth);
+      zoneEl.style.left = zoneX+'px';
+      zoneEl.style.width = zoneWidth+'px';
+      pos = rand(0, w-8); dir = Math.random()<0.5?1:-1;
+      let last = performance.now();
+      function loop(t) {
+        if (done) return;
+        const dt = Math.min(0.05, (t-last)/1000); last = t;
+        pos += dir*speed*dt;
+        if (pos < 0) { pos = 0; dir = 1; }
+        if (pos > w-8) { pos = w-8; dir = -1; }
+        markerEl.style.left = pos+'px';
+        raf = requestAnimationFrame(loop);
+      }
+      raf = requestAnimationFrame(loop);
+      function attempt() {
+        if (done) return; done = true;
+        const markerCenter = pos+4;
+        cb(markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth);
+      }
+      keyH = (e) => { if (e.code === 'Space') { e.preventDefault(); attempt(); } };
+      clickH = () => attempt();
+      window.addEventListener('keydown', keyH);
+      gaugeEl.addEventListener('click', clickH);
+    }
+    function cleanup() {
+      done = true;
+      cancelAnimationFrame(raf);
+      if (keyH) window.removeEventListener('keydown', keyH);
+    }
+    return { init, cleanup };
+  }
+
+  function simonFlashGame() {
+    let done, tiles, sequence, playerIdx, detachNav;
+    const colors = ['#d8324a','#2a63d8','#ffd23f','#2ea043'];
+    function init(c, duration, cb, level) {
+      done = false;
+      level = level || 1;
+      const len = Math.min(4, 3 + Math.floor(level/3));
+      sequence = Array.from({length: len}, () => Math.floor(rand(0,4)));
+      playerIdx = 0;
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      const sg = c.querySelector('#sg');
+      tiles = colors.map((col,i) => {
+        const t = document.createElement('div');
+        t.className = 'simonTile';
+        t.style.background = col;
+        t.addEventListener('click', () => onTileClick(i));
+        sg.appendChild(t);
+        return t;
+      });
+      detachNav = attachArrowGridNav(tiles, 2, onTileClick);
+      let accepting = false;
+      let i = 0;
+      const flashSpeed = Math.max(280, 520 - level*20);
+      function playStep() {
+        if (done) return;
+        if (i >= sequence.length) { accepting = true; return; }
+        const idx = sequence[i];
+        tiles[idx].classList.add('lit');
+        setTimeout(() => {
+          if (done) return;
+          tiles[idx].classList.remove('lit');
+          i++;
+          setTimeout(playStep, flashSpeed*0.35);
+        }, flashSpeed*0.65);
+      }
+      setTimeout(playStep, 400);
+      function onTileClick(idx) {
+        if (done || !accepting) return;
+        tiles[idx].classList.add('lit');
+        setTimeout(() => { if (tiles[idx]) tiles[idx].classList.remove('lit'); }, 150);
+        if (idx !== sequence[playerIdx]) { done = true; cb(false); return; }
+        playerIdx++;
+        if (playerIdx >= sequence.length) { done = true; cb(true); }
+      }
+    }
+    function cleanup() { done = true; if (detachNav) detachNav(); }
+    return { init, cleanup };
+  }
+
+  function balanceGame() {
+    let done, raf, keyH, keys, angle, dotPos, vel, w, h, platform, dot, windTarget, windTimer;
+    function init(c, duration, cb, level) {
+      done = false;
+      level = level || 1;
+      keys = {};
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">KEEP IT BALANCED!</div><div id="balanceZone"></div><div id="balancePlatform"></div><div id="balanceDot"></div></div>';
+      platform = c.querySelector('#balancePlatform');
+      dot = c.querySelector('#balanceDot');
+      w = c.clientWidth; h = c.clientHeight;
+      const tiltSpeed = 60 + level*4;
+      const gravity = 1.0 + level*0.08;
+      // ambient "wind" keeps nudging the platform toward a shifting random angle,
+      // so standing still is never a valid strategy -- you always have to react.
+      const windAmp = 14 + level*1.4;
+      const windPull = 0.9 + level*0.03;
+      windTarget = rand(-windAmp, windAmp);
+      // start already tilted toward the first wind target (with a bit of initial
+      // roll speed) so the ball is visibly moving the instant the round begins,
+      // instead of sitting still for the first fraction of a second.
+      angle = windTarget * 0.5;
+      dotPos = 0; vel = (windTarget/35) * gravity * 0.15;
+      keyH = (e) => {
+        if (['ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+        keys[e.key] = (e.type === 'keydown');
+      };
+      window.addEventListener('keydown', keyH);
+      window.addEventListener('keyup', keyH);
+      windTimer = setInterval(() => { windTarget = rand(-windAmp, windAmp); }, Math.max(650, 1400 - level*35));
+      let last = performance.now();
+      function loop(t) {
+        if (done) return;
+        const dt = Math.min(0.05, (t-last)/1000); last = t;
+        angle += (windTarget - angle) * windPull * dt;
+        if (keys['ArrowLeft']) angle -= tiltSpeed*dt;
+        if (keys['ArrowRight']) angle += tiltSpeed*dt;
+        angle = Math.max(-35, Math.min(35, angle));
+        vel += (angle/35) * gravity * dt;
+        vel *= 0.995;
+        dotPos += vel*dt;
+        dotPos = Math.max(-1.15, Math.min(1.15, dotPos));
+        platform.style.transform = 'translate(-50%,-50%) rotate('+angle+'deg)';
+        const rad = angle*Math.PI/180;
+        const half = w*0.31;
+        const dx = Math.cos(rad)*dotPos*half;
+        const dy = Math.sin(rad)*dotPos*half;
+        dot.style.left = (w/2 + dx - 13) + 'px';
+        dot.style.top = (h*0.45 + dy - 13) + 'px';
+        if (Math.abs(dotPos) >= 1.15) { done = true; cb(false); return; }
+        raf = requestAnimationFrame(loop);
+      }
+      raf = requestAnimationFrame(loop);
+    }
+    function cleanup() {
+      done = true;
+      cancelAnimationFrame(raf);
+      clearInterval(windTimer);
+      if (keyH) { window.removeEventListener('keydown', keyH); window.removeEventListener('keyup', keyH); }
+    }
+    return { init, cleanup, get onTimeoutSuccess() { return true; } };
+  }
+
+  function trueReactionGame() {
+    let done, delayTimeout, windowTimeout, btn, fillEl, promptEl, windowMs, state;
+    function init(c, duration, cb, level) {
+      done = false;
+      level = level || 1;
+      state = 'red';
+      windowMs = Math.max(260, 1300 - level*130);
+      const delayMs = rand(700, 1900);
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt" id="reactPrompt">WAIT FOR GREEN!</div><div id="reactWindowBar"><div id="reactWindowFill"></div></div><button id="reactBtn">WAIT...</button></div>';
+      btn = c.querySelector('#reactBtn');
+      fillEl = c.querySelector('#reactWindowFill');
+      promptEl = c.querySelector('#reactPrompt');
+      fillEl.style.transition = 'none';
+      fillEl.style.width = '100%';
+      btn.style.background = '#d8324a';
+      btn.style.borderColor = '#6e0f1e';
+      btn.addEventListener('click', () => {
+        if (done) return;
+        if (state === 'red') { done = true; clearTimeout(delayTimeout); cb(false); return; }
+        done = true;
+        clearTimeout(windowTimeout);
+        cb(true);
+      });
+      delayTimeout = setTimeout(() => {
+        if (done) return;
+        state = 'green';
+        promptEl.textContent = 'CLICK NOW!';
+        btn.textContent = 'CLICK!';
+        btn.style.background = '#2ea043';
+        btn.style.borderColor = '#123a1e';
+        fillEl.style.width = '100%';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (done) return;
+            fillEl.style.transition = 'width '+windowMs+'ms linear';
+            fillEl.style.width = '0%';
+          });
+        });
+        windowTimeout = setTimeout(() => {
+          if (done) return; done = true;
+          cb(false);
+        }, windowMs);
+      }, delayMs);
+    }
+    function cleanup() { done = true; clearTimeout(delayTimeout); clearTimeout(windowTimeout); }
+    return { init, cleanup };
+  }
+
+  // ---------- MAIN GAME LOOP ----------
+  function computeDuration(entry, level, container) {
+    if (entry.getDuration) return entry.getDuration(level, container);
+    return entry.noShrink ? entry.baseDuration : Math.max(1.4, entry.baseDuration - (level-1)*0.22);
+  }
+  const commands = ['CLICK!','DODGE!','TYPE!','MASH!','RESIST!','SPOT IT!'];
+  const microgamePool = [
+    { name:'click', factory: colorClickGame, cmd:'CLICK!', baseDuration: 3.2 },
+    { name:'dodge', factory: dodgeGame, cmd:'DODGE!', baseDuration: 3.6 },
+    { name:'type', factory: typeGame, cmd:'TYPE!', baseDuration: 4.2 },
+    { name:'mash', factory: mashGame, cmd:'MASH!', baseDuration: 3.6 },
+    { name:'creeper', factory: avoidCreeperGame, cmd:'RUN!', baseDuration: 3.6 },
+    { name:'spot', factory: spotDiffGame, cmd:'SPOT IT!', baseDuration: 4.0 },
+    { name:'catch', factory: catchGame, cmd:'CATCH!', baseDuration: 12, noShrink: true, hideTimer: true },
+    { name:'reaction', factory: reactionArrowGame, cmd:'REACT!', baseDuration: 1.8 },
+    { name:'math', factory: quickMathGame, cmd:'SOLVE!', baseDuration: 3.2 },
+    { name:'stopbar', factory: stopBarGame, cmd:'STOP IT!', baseDuration: 4.0,
+      getDuration: (level, container) => {
+        const w = (container ? container.clientWidth : 400) * 0.8; // #gaugeWrap is left/right:10%
+        const speed = 220 + level*30;
+        // Worst case the marker starts at one end moving away from the zone at the
+        // other end: it has to cross the whole track, bounce, and cross back before
+        // it can ever enter the zone -- that's up to 2*w of travel. Guarantee enough
+        // time for that full worst-case approach plus a real reaction window once
+        // it arrives, so every level stays winnable no matter how bad the start is.
+        const worstApproachSec = (2*w) / speed;
+        const reactionBufferSec = 0.9;
+        return Math.max(2.2, worstApproachSec + reactionBufferSec);
+      }
+    },
+    { name:'simon', factory: simonFlashGame, cmd:'REPEAT!', baseDuration: 9.5, noShrink: true },
+    { name:'balance', factory: balanceGame, cmd:'BALANCE!', baseDuration: 4.5 },
+    { name:'reacttest', factory: trueReactionGame, cmd:'REACT!', baseDuration: 3.4, noShrink: true, hideTimer: true },
+  ];
+
+  // ---------- TEST MODE ----------
+  function buildTestMenu() {
+    testGameList.innerHTML = '';
+    microgamePool.forEach(entry => {
+      const btn = document.createElement('button');
+      btn.className = 'bigBtn';
+      btn.style.cssText = 'padding:10px 16px; font-size:14px;';
+      btn.textContent = entry.cmd + ' (' + entry.name + ')';
+      btn.addEventListener('click', () => enterTestMode(entry));
+      testGameList.appendChild(btn);
+    });
+  }
+
+  function updateTestLevelLabel() { testLevelLabel.textContent = 'TEST LEVEL ' + testLevel; }
+
+  function enterTestMode(entry) {
+    testMode = true;
+    testEntry = entry;
+    testMenu.style.display = 'none';
+    centerMenu.style.display = 'none';
+    testHud.style.display = 'flex';
+    testGameName.textContent = entry.cmd + ' / ' + entry.name;
+    testEscHandler = (e) => { if (e.key === 'Escape') exitTestMode(); };
+    window.addEventListener('keydown', testEscHandler);
+    runTestRound();
+  }
+
+  function runTestRound() {
+    if (!testMode) return;
+    if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
+    stage.innerHTML = '';
+    const duration = computeDuration(testEntry, testLevel, stage);
+
+    commandOverlay.style.display = 'flex';
+    commandText.textContent = testEntry.cmd;
+    commandText.className = '';
+    void commandText.offsetWidth;
+    commandText.className = 'slam';
+
+    setTimeout(() => {
+      if (!testMode) return;
+      commandOverlay.style.display = 'none';
+      const game = testEntry.factory();
+      let resolved = false;
+      function onResult(success) {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutHandle);
+        try { game.cleanup(); } catch(e){}
+        currentCleanup = null;
+        resultText.textContent = success ? 'SUCCESS!' : 'FAIL!';
+        resultText.className = success ? 'success-banner' : 'fail-banner';
+        resultBanner.classList.add('show');
+        doFlash();
+        setTimeout(() => {
+          resultBanner.classList.remove('show');
+          if (testMode) runTestRound();
+        }, 550);
+      }
+      game.init(stage, duration, onResult, testLevel);
+      currentCleanup = () => game.cleanup();
+      timerWrap.style.display = testEntry.hideTimer ? 'none' : 'block';
+      const startTime = performance.now();
+      timerBar.style.background = '#2ea043';
+      function tick() {
+        if (resolved || !testMode) return;
+        const elapsed = (performance.now() - startTime)/1000;
+        const pctLeft = Math.max(0, 1 - elapsed/duration);
+        timerBar.style.width = (pctLeft*100) + '%';
+        if (pctLeft < 0.3) timerBar.style.background = '#d8324a';
+        if (pctLeft > 0) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+      timeoutHandle = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        onResult(!!game.onTimeoutSuccess);
+      }, duration*1000);
+    }, 420);
+  }
+
+  function exitTestMode() {
+    testMode = false;
+    if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
+    clearTimeout(timeoutHandle);
+    stage.innerHTML = '';
+    testHud.style.display = 'none';
+    timerWrap.style.display = 'none';
+    commandOverlay.style.display = 'none';
+    resultBanner.classList.remove('show');
+    if (testEscHandler) { window.removeEventListener('keydown', testEscHandler); testEscHandler = null; }
+    centerMenu.style.display = 'flex';
+  }
+
+  testModeBtn.addEventListener('click', () => {
+    buildTestMenu();
+    updateTestLevelLabel();
+    centerMenu.style.display = 'none';
+    testMenu.style.display = 'flex';
+  });
+  testBackBtn.addEventListener('click', () => {
+    testMenu.style.display = 'none';
+    centerMenu.style.display = 'flex';
+  });
+  testLevelUp.addEventListener('click', () => { testLevel = Math.min(20, testLevel+1); updateTestLevelLabel(); });
+  testLevelDown.addEventListener('click', () => { testLevel = Math.max(1, testLevel-1); updateTestLevelLabel(); });
+  testExitBtn.addEventListener('click', exitTestMode);
+
+  function updateLivesUI() {
+    livesEl.innerHTML = 'LIVES: ' + '<span>&#9829;</span>'.repeat(lives);
+  }
+
+  function startGame() {
+    lives = 3; level = 1; streak = 0;
+    centerMenu.style.display = 'none';
+    hud.style.display = 'flex';
+    timerWrap.style.display = 'block';
+    updateLivesUI();
+    levelLabel.textContent = 'LEVEL ' + level;
+    nextRound();
+  }
+
+  function endGame() {
+    hud.style.display = 'none';
+    timerWrap.style.display = 'none';
+    stage.innerHTML = '';
+    bestStreak = Math.max(bestStreak, streak);
+    statLine.textContent = 'Streak: ' + streak + '  |  Best: ' + bestStreak;
+    centerMenu.style.display = 'flex';
+    startBtn.textContent = 'PLAY AGAIN';
+  }
+
+  function nextRound() {
+    if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
+    stage.innerHTML = '';
+    level = Math.floor(streak / 3) + 1;
+    levelLabel.textContent = 'LEVEL ' + level;
+
+    const pool = microgamePool.filter(g => g.name !== lastGameName);
+    const entry = pick(pool.length ? pool : microgamePool);
+    lastGameName = entry.name;
+    const duration = computeDuration(entry, level, stage);
+
+    // command slam
+    commandOverlay.style.display = 'flex';
+    commandText.textContent = entry.cmd;
+    commandText.className = '';
+    void commandText.offsetWidth;
+    commandText.className = 'slam';
+    vibScreen();
+
+    setTimeout(() => {
+      commandOverlay.style.display = 'none';
+      runMicrogame(entry, duration);
+    }, 420);
+  }
+
+  function runMicrogame(entry, duration) {
+    const game = entry.factory();
+    let resolved = false;
+
+    function onResult(success) {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeoutHandle);
+      handleRoundEnd(success, game);
+    }
+
+    game.init(stage, duration, onResult, level);
+    currentCleanup = () => game.cleanup();
+
+    timerWrap.style.display = entry.hideTimer ? 'none' : 'block';
+
+    // timer bar
+    const startTime = performance.now();
+    timerBar.style.background = '#2ea043';
+    function tick() {
+      if (resolved) return;
+      const elapsed = (performance.now() - startTime)/1000;
+      const pctLeft = Math.max(0, 1 - elapsed/duration);
+      timerBar.style.width = (pctLeft*100) + '%';
+      if (pctLeft < 0.3) timerBar.style.background = '#d8324a';
+      if (pctLeft > 0) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    timeoutHandle = setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      const successOnTimeout = !!game.onTimeoutSuccess;
+      handleRoundEnd(successOnTimeout, game);
+    }, duration*1000);
+  }
+
+  function showToast(msg) {
+    streakToast.textContent = msg;
+    streakToast.className = '';
+    void streakToast.offsetWidth;
+    streakToast.className = 'toastShow';
+  }
+
+  function handleRoundEnd(success, game) {
+    try { game.cleanup(); } catch(e){}
+    currentCleanup = null;
+
+    resultText.textContent = success ? 'SUCCESS!' : 'FAIL!';
+    resultText.className = success ? 'success-banner' : 'fail-banner';
+    resultBanner.classList.add('show');
+    doFlash();
+    if (!success) vibScreen();
+
+    setTimeout(() => {
+      resultBanner.classList.remove('show');
+      if (success) {
+        streak++;
+        if (streak % 10 === 0) showToast('SPEED UP! x' + streak);
+        nextRound();
+      } else {
+        lives--;
+        updateLivesUI();
+        if (lives <= 0) {
+          setTimeout(endGame, 200);
+        } else {
+          nextRound();
+        }
+      }
+    }, 550);
+  }
+
+  startBtn.addEventListener('click', startGame);
+})();
+</script>
+</body>
+</html>
