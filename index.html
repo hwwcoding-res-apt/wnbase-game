@@ -98,11 +98,31 @@
     gap: 4vmin; width: 60vmin; height: 60vmin; max-width: 80vw; max-height: 65vh;
   }
   .sq {
-    border-radius: 14px; cursor: pointer; border: 4px solid #222; width: 100%; height: 100%;
+    border-radius: 14px; cursor: pointer; border: 4px solid #222; width: 100%; height: 100%; position: relative;
   }
-  .glow { box-shadow: 0 0 0 6px #fff, 0 0 30px 10px #ffd23f inset; animation: pulse 0.4s infinite alternate; }
+  /* Default: inside-the-box indicators (not borders) so the glow target and the
+     keyboard cursor stay visible and distinguishable no matter what tile color
+     or combination they land on. Toggle body.legacyHighlight to restore the
+     old border/outline-based system. */
+  .glow::before {
+    content: ''; position: absolute; inset: 10%; border-radius: 10px;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.55) 65%, transparent 100%);
+    animation: glowPulse 0.4s infinite alternate; pointer-events: none;
+  }
+  @keyframes glowPulse { from { opacity: 0.55; } to { opacity: 1; } }
   @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.5); } }
-  .cursorSel { outline: 6px dashed #2a63d8; outline-offset: -6px; }
+  .cursorSel { z-index: 2; }
+  .cursorSel::after {
+    content: ''; position: absolute; top: 6px; left: 6px; width: 22px; height: 22px;
+    border-radius: 50%; background: #00e0ff; box-shadow: 0 0 0 3px #003a44, 0 0 10px 3px rgba(0,224,255,0.9);
+    animation: cursorPulse 0.5s infinite alternate; pointer-events: none;
+  }
+  @keyframes cursorPulse { from { transform: scale(0.85); } to { transform: scale(1.05); } }
+
+  body.legacyHighlight .glow::before { content: none; }
+  body.legacyHighlight .cursorSel::after { content: none; }
+  body.legacyHighlight .glow { box-shadow: 0 0 0 6px #fff, 0 0 30px 10px #ffd23f inset; animation: pulse 0.4s infinite alternate; }
+  body.legacyHighlight .cursorSel { outline: 8px solid #ffd23f; outline-offset: 4px; box-shadow: 0 0 0 4px #222, 0 0 22px 6px #ffd23f; }
   #gridHint { position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 900; color: #555; z-index: 10; }
 
   #dodgeArena { position: absolute; inset: 0; background: #dfe9f3; }
@@ -120,11 +140,12 @@
   #mashBarWrap { position: absolute; top: 45%; left: 10%; right: 10%; height: 40px; background: #ccc; border: 4px solid #222; border-radius: 20px; overflow: hidden; }
   #mashBarFill { height: 100%; width: 0%; background: #ffd23f; transition: background 0.2s; }
   #mashRival { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 900; color: #d8324a; }
-  #mashBtn {
-    position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
-    font-size: 26px; font-weight: 900; padding: 18px 40px; border-radius: 12px;
+  .mashSideBtn {
+    font-size: 30px; font-weight: 900; padding: 18px 32px; border-radius: 12px;
     background: #2a63d8; color: #fff; border: 4px solid #123a80; cursor: pointer;
+    user-select: none;
   }
+  .mashSideBtn:active { transform: scale(0.94); }
 
   .coinField { position: absolute; inset: 0; }
   .coinItem {
@@ -136,21 +157,7 @@
   .coinItem.collected { transform: scale(0); pointer-events: none; }
   .coinItem:active { transform: scale(0.9); }
 
-  #creeperArena { position: absolute; inset: 0; background: #1b2b1b; }
-  #creeperPlayer { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; z-index: 5; }
-  #creeperEnemy { position: absolute; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 34px; z-index: 5; }
-  .creeperEnemy2 { position: absolute; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 30px; z-index: 5; }
-
-  #catchArena { position: absolute; inset: 0; background: #cfe8ff; }
-  #catchBasket { position: absolute; bottom: 12%; font-size: 42px; transform: translateX(-50%); }
-  .fallItem { position: absolute; font-size: 28px; transform: translateX(-50%); }
-  #catchCount { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 900; color: #222; z-index: 10; }
-
   #reactionArrow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 18vmin; }
-
-  #mathEq { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%); font-size: 52px; font-weight: 900; color: #222; }
-  #mathOpts { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
-  .mathOptBtn { font-size: 28px; font-weight: 900; padding: 14px 26px; border-radius: 10px; border: 4px solid #222; background: #fff; cursor: pointer; }
 
   #dontBtn {
     position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%) scale(1);
@@ -166,7 +173,7 @@
 
   .diffGrid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 4vmin; }
   .diffBoard { display: grid; grid-template-columns: repeat(7,1fr); grid-template-rows: repeat(7,1fr); gap: 3px; width: 68vmin; height: 68vmin; max-width: 88vw; max-height: 68vh; }
-  .diffCell { border-radius: 6px; }
+  .diffCell { border-radius: 6px; position: relative; }
 
   #streakToast {
     position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
@@ -190,17 +197,26 @@
 
   /* --- simon flash --- */
   .simonGrid { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 4vmin; width: 60vmin; height: 60vmin; max-width: 80vw; max-height: 60vh; }
-  .simonTile { border-radius: 14px; border: 4px solid #222; cursor: pointer; filter: brightness(0.55); transition: filter 0.15s; }
+  .simonTile { border-radius: 14px; border: 4px solid #222; cursor: pointer; filter: brightness(0.55); transition: filter 0.15s; position: relative; }
   .simonTile.lit { filter: brightness(1.5); box-shadow: 0 0 30px 10px #fff inset; }
+  .simonNumber {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0);
+    font-size: 9vmin; font-weight: 900; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+    animation: simonNumPop 0.28s ease-out forwards; pointer-events: none; z-index: 3;
+  }
+  @keyframes simonNumPop {
+    0% { transform: translate(-50%,-50%) scale(0); opacity: 0; }
+    60% { transform: translate(-50%,-50%) scale(1.35); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+  }
 
   /* --- balance it --- */
   #balancePlatform { position: absolute; top: 45%; left: 50%; width: 62vmin; height: 14px; background: #5a3a1e; border-radius: 8px; transform-origin: center; }
   #balanceDot { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; }
   #balanceZone { position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%); width: 70px; height: 70px; border-radius: 50%; border: 3px dashed #2ea043; pointer-events: none; }
-
   /* --- reaction time test --- */
   #reactBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 22px; font-weight: 900; padding: 22px 44px; border-radius: 14px; background: #d8324a; color: #fff; border: 5px solid #6e0f1e; cursor: pointer; }
-  #reactWindowBar { position: absolute; top: 30%; left: 20%; right: 20%; height: 14px; background: #ccc; border: 3px solid #222; border-radius: 8px; overflow: hidden; }
+  #reactWindowBar { position: absolute; top: 28%; left: 15%; right: 15%; height: 48px; background: #ccc; border: 4px solid #222; border-radius: 12px; overflow: hidden; }
   #reactWindowFill { height: 100%; width: 100%; background: #ffd23f; }
 </style>
 </head>
@@ -224,7 +240,60 @@
     <p>A word flashes. Then you've got seconds to survive the microgame. Fail three times and it's over. Speed ramps up every round.</p>
     <div id="statLine"></div>
     <button class="bigBtn" id="startBtn">START</button>
+    <button class="bigBtn" id="friendBtn" style="background:#8a3fd8;color:#fff;box-shadow:0 4px 0 #3f1a70;">PLAY WITH FRIEND</button>
     <button class="bigBtn" id="testModeBtn" style="background:#2a63d8;color:#fff;box-shadow:0 4px 0 #123a80;">TEST MODE</button>
+  </div>
+
+  <div id="difficultyMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:26px; color:#fff; text-shadow:3px 3px 0 #000;">CHOOSE DIFFICULTY</h1>
+    <button class="bigBtn" id="diffEasyBtn" style="background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">EASY</button>
+    <button class="bigBtn" id="diffMediumBtn" style="background:#ffd23f; color:#3a2a00; box-shadow:0 4px 0 #7a5b00;">MEDIUM</button>
+    <button class="bigBtn" id="diffHardBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">HARD</button>
+    <button class="bigBtn" id="diffCancelBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
+  </div>
+
+  <div id="roomDiffMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:26px; color:#fff; text-shadow:3px 3px 0 #000;">ROOM DIFFICULTY</h1>
+    <p style="color:#ddd; font-size:13px; max-width:280px;">Whoever opens the link plays this same difficulty, in sync with you.</p>
+    <button class="bigBtn" id="roomEasyBtn" style="background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">EASY</button>
+    <button class="bigBtn" id="roomMediumBtn" style="background:#ffd23f; color:#3a2a00; box-shadow:0 4px 0 #7a5b00;">MEDIUM</button>
+    <button class="bigBtn" id="roomHardBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">HARD</button>
+    <button class="bigBtn" id="roomDiffCancelBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
+  </div>
+
+  <div id="roomLinkMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:22px; color:#fff; text-shadow:3px 3px 0 #000;">SEND THIS LINK</h1>
+    <p style="color:#ddd; font-size:13px; max-width:300px;">Share it with your friend. The match starts for both of you the moment the countdown hits zero.</p>
+    <textarea id="roomLinkText" readonly style="width:88%; max-width:420px; height:60px; font-size:12px; padding:10px; border-radius:8px; border:2px solid #333; resize:none;"></textarea>
+    <button class="bigBtn" id="roomCopyBtn" style="background:#2a63d8;color:#fff;box-shadow:0 4px 0 #123a80; font-size:14px;">COPY LINK</button>
+    <button class="bigBtn" id="roomEnterLobbyBtn" style="background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">CONTINUE</button>
+    <button class="bigBtn" id="roomLinkBackBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
+  </div>
+
+  <div id="lobbyScreen" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.7); flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; text-align:center;">
+    <h1 style="font-size:24px; color:#ffd23f; text-shadow:3px 3px 0 #000;">WAITING TO SYNC...</h1>
+    <div id="lobbyCountdown" style="font-size:60px; color:#fff; text-shadow:3px 3px 0 #000;">--</div>
+    <p id="lobbyNote" style="color:#ccc; font-size:13px; max-width:300px;">Make sure your friend has opened the same link.</p>
+    <button class="bigBtn" id="lobbyMinus15Btn" style="background:#ffd23f; color:#3a2a00; box-shadow:0 4px 0 #7a5b00; font-size:14px;">-15s</button>
+    <p style="color:#888; font-size:11px; max-width:280px;">Both of you have to press this the same number of times or you'll start at different moments -- agree out loud first ("let's both hit it 6 times").</p>
+    <button class="bigBtn" id="lobbyLeaveBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">LEAVE ROOM</button>
+  </div>
+
+  <div id="matchSummaryScreen" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:flex-start; gap:12px; padding:20px; overflow-y:auto; text-align:center;">
+    <h1 style="font-size:26px; color:#ffd23f; text-shadow:3px 3px 0 #d8324a;">MATCH SUMMARY</h1>
+    <div id="msYourStats" style="font-size:14px; color:#ddd;"></div>
+    <div id="msYourRounds" style="width:100%; max-width:520px; display:flex; flex-wrap:wrap; gap:4px; justify-content:center;"></div>
+
+    <p style="color:#aaa; font-size:12px; max-width:420px; margin-top:6px;">Send this code to your friend, and paste theirs below to compare how you each did.</p>
+    <button class="bigBtn" id="msCopyBtn" style="background:#2a63d8; color:#fff; box-shadow:0 4px 0 #123a80; font-size:14px;">COPY MY RESULT</button>
+    <textarea id="msYourCode" readonly style="width:100%; max-width:520px; height:52px; font-family:monospace; font-size:11px; padding:8px; border-radius:8px; border:3px solid #444; background:#1c1c1c; color:#ddd; resize:vertical;"></textarea>
+
+    <textarea id="msPasteCode" placeholder="Paste your friend's code here..." style="width:100%; max-width:520px; height:52px; font-family:monospace; font-size:11px; padding:8px; border-radius:8px; border:3px solid #444; background:#1c1c1c; color:#ddd; resize:vertical;"></textarea>
+    <button class="bigBtn" id="msCompareBtn" style="background:#ffd23f; color:#222; box-shadow:0 4px 0 #b58f1a; font-size:14px;">COMPARE</button>
+
+    <div id="msCompareResult" style="width:100%; max-width:520px; display:none; flex-direction:column; gap:10px; align-items:center;"></div>
+
+    <button class="bigBtn" id="msBackBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e; margin-top:6px;">BACK TO MENU</button>
   </div>
 
   <div id="testMenu" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
@@ -237,16 +306,52 @@
       <button id="testLevelUp" class="bigBtn" style="padding:8px 16px; font-size:16px;">+</button>
     </div>
     <button class="bigBtn" id="testBackBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">BACK</button>
+    <button class="bigBtn" id="balModeBtn" style="background:#ffd23f; color:#222; box-shadow:0 4px 0 #b58f1a; margin-top:2px;">BALANCING MODE</button>
+  </div>
+
+  <div id="balancingConfig" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:26px; color:#ffd23f; text-shadow:3px 3px 0 #d8324a;">BALANCING MODE</h1>
+    <p style="color:#aaa; font-size:13px; max-width:340px;">Plays every microgame back-to-back, this many times each, at the current test level. At the end you'll see every attempt's closeness-to-losing percentage per game.</p>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button id="balRepsDown" class="bigBtn" style="padding:8px 16px; font-size:16px;">-</button>
+      <span id="balRepsLabel" style="font-size:16px; font-weight:900;">REPS: 5</span>
+      <button id="balRepsUp" class="bigBtn" style="padding:8px 16px; font-size:16px;">+</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button id="balConfigLevelDown" class="bigBtn" style="padding:8px 16px; font-size:16px;">-</button>
+      <span id="balConfigLevelLabel" style="font-size:16px; font-weight:900;">TEST LEVEL 1</span>
+      <button id="balConfigLevelUp" class="bigBtn" style="padding:8px 16px; font-size:16px;">+</button>
+    </div>
+    <button class="bigBtn" id="balStartBtn">START</button>
+    <button class="bigBtn" id="balConfigBackBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">BACK</button>
+  </div>
+
+  <div id="balancingResultsScreen" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:flex-start; gap:12px; padding:20px; overflow-y:auto;">
+    <h1 style="font-size:24px; color:#ffd23f; text-shadow:3px 3px 0 #d8324a;">BALANCING RESULTS</h1>
+    <div id="balResultsList" style="width:100%; max-width:520px; display:flex; flex-direction:column; gap:12px; padding-bottom:8px;"></div>
+    <button class="bigBtn" id="balCopyBtn" style="background:#2a63d8; color:#fff; box-shadow:0 4px 0 #123a80;">COPY RESULTS</button>
+    <textarea id="balResultsText" readonly style="width:100%; max-width:520px; height:140px; font-family:monospace; font-size:12px; padding:8px; border-radius:8px; border:3px solid #444; background:#1c1c1c; color:#ddd; resize:vertical;"></textarea>
+    <button class="bigBtn" id="balResultsBackBtn" style="background:#d8324a; color:#fff; box-shadow:0 4px 0 #6e0f1e;">BACK TO TEST MENU</button>
   </div>
 
   <div id="testHud" style="display:none; position:absolute; top:0; left:0; right:0; z-index:60; justify-content:space-between; align-items:center; padding:12px 18px; pointer-events:none;">
     <span style="font-weight:900; color:#2a63d8; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #123a80;">TEST: <span id="testGameName"></span></span>
     <span style="font-weight:900; color:#222; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #222; pointer-events:auto; cursor:pointer;" id="testExitBtn">EXIT (ESC)</span>
   </div>
+
+  <div id="balancingHud" style="display:none; position:absolute; top:0; left:0; right:0; z-index:60; justify-content:space-between; align-items:center; padding:12px 18px; pointer-events:none;">
+    <span style="font-weight:900; color:#2a63d8; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #123a80;" id="balHudLabel"></span>
+    <span style="font-weight:900; color:#222; background:#fff; padding:4px 10px; border-radius:6px; border:3px solid #222; pointer-events:auto; cursor:pointer;" id="balExitBtn">EXIT (ESC)</span>
+  </div>
 </div>
 
 <script>
 (function(){
+  // Set to true to restore the old border/outline-based glow + cursor
+  // highlight system (see .legacyHighlight CSS rules).
+  const USE_LEGACY_HIGHLIGHT = false;
+  if (USE_LEGACY_HIGHLIGHT) document.body.classList.add('legacyHighlight');
+
   const stage = document.getElementById('stage');
   const hud = document.getElementById('hud');
   const livesEl = document.getElementById('lives');
@@ -260,6 +365,36 @@
   const resultText = document.getElementById('resultText');
   const centerMenu = document.getElementById('centerMenu');
   const startBtn = document.getElementById('startBtn');
+  const difficultyMenu = document.getElementById('difficultyMenu');
+  const diffEasyBtn = document.getElementById('diffEasyBtn');
+  const diffMediumBtn = document.getElementById('diffMediumBtn');
+  const diffHardBtn = document.getElementById('diffHardBtn');
+  const diffCancelBtn = document.getElementById('diffCancelBtn');
+  const friendBtn = document.getElementById('friendBtn');
+  const roomDiffMenu = document.getElementById('roomDiffMenu');
+  const roomEasyBtn = document.getElementById('roomEasyBtn');
+  const roomMediumBtn = document.getElementById('roomMediumBtn');
+  const roomHardBtn = document.getElementById('roomHardBtn');
+  const roomDiffCancelBtn = document.getElementById('roomDiffCancelBtn');
+  const roomLinkMenu = document.getElementById('roomLinkMenu');
+  const roomLinkText = document.getElementById('roomLinkText');
+  const roomCopyBtn = document.getElementById('roomCopyBtn');
+  const roomEnterLobbyBtn = document.getElementById('roomEnterLobbyBtn');
+  const roomLinkBackBtn = document.getElementById('roomLinkBackBtn');
+  const lobbyScreen = document.getElementById('lobbyScreen');
+  const lobbyCountdown = document.getElementById('lobbyCountdown');
+  const lobbyNote = document.getElementById('lobbyNote');
+  const lobbyLeaveBtn = document.getElementById('lobbyLeaveBtn');
+  const lobbyMinus15Btn = document.getElementById('lobbyMinus15Btn');
+  const matchSummaryScreen = document.getElementById('matchSummaryScreen');
+  const msYourStats = document.getElementById('msYourStats');
+  const msYourRounds = document.getElementById('msYourRounds');
+  const msYourCode = document.getElementById('msYourCode');
+  const msCopyBtn = document.getElementById('msCopyBtn');
+  const msPasteCode = document.getElementById('msPasteCode');
+  const msCompareBtn = document.getElementById('msCompareBtn');
+  const msCompareResult = document.getElementById('msCompareResult');
+  const msBackBtn = document.getElementById('msBackBtn');
   const statLine = document.getElementById('statLine');
   const streakToast = document.getElementById('streakToast');
   const app = document.getElementById('app');
@@ -275,14 +410,77 @@
   const testExitBtn = document.getElementById('testExitBtn');
   let testMode = false, testLevel = 1, testEntry = null, testEscHandler = null;
 
+  const balModeBtn = document.getElementById('balModeBtn');
+  const balancingConfig = document.getElementById('balancingConfig');
+  const balRepsUp = document.getElementById('balRepsUp');
+  const balRepsDown = document.getElementById('balRepsDown');
+  const balRepsLabel = document.getElementById('balRepsLabel');
+  const balConfigLevelUp = document.getElementById('balConfigLevelUp');
+  const balConfigLevelDown = document.getElementById('balConfigLevelDown');
+  const balConfigLevelLabel = document.getElementById('balConfigLevelLabel');
+  const balStartBtn = document.getElementById('balStartBtn');
+  const balConfigBackBtn = document.getElementById('balConfigBackBtn');
+  const balancingHud = document.getElementById('balancingHud');
+  const balHudLabel = document.getElementById('balHudLabel');
+  const balExitBtn = document.getElementById('balExitBtn');
+  const balancingResultsScreen = document.getElementById('balancingResultsScreen');
+  const balResultsList = document.getElementById('balResultsList');
+  const balResultsBackBtn = document.getElementById('balResultsBackBtn');
+  const balCopyBtn = document.getElementById('balCopyBtn');
+  const balResultsText = document.getElementById('balResultsText');
+  let balancingActive = false, balancingReps = 5, balancingLevel = 1;
+  let balancingGameIdx = 0, balancingAttemptIdx = 0, balancingResults = [], balancingEscHandler = null;
+
+  // ---------- SEEDED RNG (for synced-seed play) ----------
+  // Every call to rand()/pick() (and any other randomness in the game) goes
+  // through rngFn. By default that's just Math.random, so normal solo play
+  // is completely unaffected. When a room seed is active, rngFn is swapped
+  // for a seeded generator instead -- from that point on, every "random"
+  // draw the game makes is actually a deterministic function of the seed,
+  // so two machines seeded identically produce identical output, draw for
+  // draw, without needing to talk to each other at all.
+  let rngFn = Math.random;
+
+  // mulberry32: small, fast, good-enough-for-games seeded PRNG.
+  function mulberry32(a) {
+    return function() {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Turns an arbitrary seed string (room seeds can be as long as you like,
+  // and can have the start time baked right into the string) into a 32-bit
+  // int mulberry32 can use.
+  function hashSeedString(str) {
+    str = String(str);
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  }
+  function seedRng(seedValue) {
+    rngFn = mulberry32(hashSeedString(seedValue));
+  }
+  function unseedRng() {
+    rngFn = Math.random;
+  }
+
   let bestStreak = 0;
   let lastGameName = null;
   let lives, level, streak, roundActive, timeoutHandle, rafHandle, currentCleanup, keyHandler;
+  let startLevel = 1;
 
   statLine.textContent = 'Best streak: ' + bestStreak;
 
-  function rand(min, max) { return Math.random() * (max - min) + min; }
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function rand(min, max) { return rngFn() * (max - min) + min; }
+  function pick(arr) { return arr[Math.floor(rngFn() * arr.length)]; }
+  function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
   function vibScreen() {
     app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
@@ -329,7 +527,7 @@
       container = c; onResult = cb; done = false;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CLICK THE GLOWING ONE!</div><div class="grid4" id="g4"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
       const g4 = c.querySelector('#g4');
-      const targetIdx = Math.floor(Math.random()*4);
+      const targetIdx = Math.floor(rngFn()*4);
       const cells = colors.map((col, i) => {
         const sq = document.createElement('div');
         sq.className = 'sq' + (i===targetIdx ? ' glow' : '');
@@ -349,7 +547,8 @@
   }
 
   function dodgeGame(reskin) {
-    let container, onResult, done, player, px, py, keys, arena, projectiles, spawnTimer, raf, w, h;
+    let container, onResult, done, player, px, py, keys, arena, projectiles, spawnTimer, raf, w, h, minDistSeen;
+    const COLLISION_R = 26, SAFE_R = 150;
     const themes = reskin || [
       { label: 'DODGE THE BLOBS!', bg:'#dfe9f3', proj:'#d8324a' },
       { label: 'DODGE THE FIREBALLS!', bg:'#3a2418', proj:'#ff8c1a' },
@@ -358,6 +557,7 @@
     function init(c, duration, cb, level) {
       container = c; onResult = cb; done = false;
       level = level || 1;
+      minDistSeen = Infinity;
       const theme = pick(themes);
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">'+theme.label+'</div><div id="dodgeArena"></div><div id="dodgePlayer"></div></div>';
       arena = c.querySelector('#dodgeArena');
@@ -374,14 +574,14 @@
       window.addEventListener('keydown', keyHandler);
       window.addEventListener('keyup', keyHandler);
 
-      const spawnInterval = Math.max(85, 260 - level*16);
-      const speedMin = 190 + level*18;
-      const speedMax = 320 + level*24;
+      const spawnInterval = Math.max(95, 270 - level*15) * 1.389 * 1.15;
+      const speedMin = 180 + level*16.5;
+      const speedMax = 305 + level*22;
 
       spawnTimer = setInterval(() => {
         if (done) return;
-        const fromLeft = Math.random() < 0.5;
-        const y = rand(h*0.15, h*0.9);
+        const fromLeft = rngFn() < 0.5;
+        const y = rand(h*0.04, h*0.94);
         const el = document.createElement('div');
         el.className = 'projectile';
         el.style.background = theme.proj;
@@ -408,7 +608,9 @@
           p.x += p.vx*dt;
           p.el.style.left = p.x+'px';
           const dx = (p.x+13)-(px+17), dy = (p.y+13)-(py+17);
-          if (Math.sqrt(dx*dx+dy*dy) < 26) { done = true; onResult(false); return; }
+          const dist = Math.sqrt(dx*dx+dy*dy);
+          if (dist < minDistSeen) minDistSeen = dist;
+          if (dist < 26) { done = true; onResult(false); return; }
         }
         projectiles = projectiles.filter(p => p.x > -60 && p.x < w+60);
         raf = requestAnimationFrame(loop);
@@ -424,12 +626,16 @@
       cancelAnimationFrame(raf);
       if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
     }
-    return { init, cleanup, get onTimeoutSuccess() { return true; } };
+    function getDanger() {
+      if (!isFinite(minDistSeen)) return 0; // no projectiles ever got close
+      return clamp01(1 - (minDistSeen - COLLISION_R) / (SAFE_R - COLLISION_R));
+    }
+    return { init, cleanup, getDanger, get onTimeoutSuccess() { return true; } };
   }
 
   function typeGame() {
     let container, onResult, done, input;
-    const words = ['JUMP','QUICK','ZEBRA','PANIC','GLYPH','FUZZY','VIVID','CRISP','MICRO','WARIO'];
+    const words = ['THAT','HAVE','WITH','THIS','THEY','FROM','WHICH','WILL','WOULD','THERE'];
     function init(c, duration, cb) {
       container = c; onResult = cb; done = false;
       const word = pick(words);
@@ -447,42 +653,47 @@
   }
 
   function mashGame() {
-    let container, onResult, done, fill, pct, keyH, pressedKeys, decayTimer, lastPress;
+    let container, onResult, done, fill, pct, keyH, decayTimer;
     function init(c, duration, cb, level) {
-      container = c; onResult = cb; done = false; pct = 20; pressedKeys = new Set();
+      container = c; onResult = cb; done = false; pct = 20;
       level = level || 1;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">MASH ANY KEY! DON\'T LET GO!</div><div id="mashRival">RIVAL IS PULLING BACK!</div><div id="mashBarWrap"><div id="mashBarFill"></div></div><div id="mashBtn">MASH!</div></div>';
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">MASH ANYTHING, FAST!</div><div id="mashRival">RIVAL IS PULLING BACK!</div><div id="mashBarWrap"><div id="mashBarFill"></div></div>'
+        + '<div style="position:absolute; bottom:15%; left:50%; transform:translateX(-50%); display:flex; gap:16px;">'
+        + '<div id="mashBtnLeft" class="mashSideBtn">◄</div><div id="mashBtnRight" class="mashSideBtn">►</div>'
+        + '</div></div>';
       fill = c.querySelector('#mashBarFill');
       fill.style.width = pct + '%';
-      const btn = c.querySelector('#mashBtn');
+      const leftBtn = c.querySelector('#mashBtnLeft');
+      const rightBtn = c.querySelector('#mashBtnRight');
 
       function render() {
         fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
         fill.style.background = pct > 66 ? '#2ea043' : pct > 33 ? '#ffd23f' : '#d8324a';
       }
-      function bump() {
+      function press() {
         if (done) return;
         pct = Math.min(100, pct + 6);
         render();
         if (pct >= 100) { done = true; onResult(true); }
       }
-      btn.addEventListener('click', bump);
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); bump(); });
+      leftBtn.addEventListener('click', () => press());
+      rightBtn.addEventListener('click', () => press());
+      leftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); });
+      rightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); });
       keyH = (e) => {
-        if (e.type === 'keydown') {
-          e.preventDefault();
-          if (!pressedKeys.has(e.code)) { pressedKeys.add(e.code); bump(); }
-        } else if (e.type === 'keyup') {
-          pressedKeys.delete(e.code);
-        }
+        if (e.type !== 'keydown' || e.repeat) return; // ignore OS auto-repeat from a held key
+        if (['Shift','Control','Alt','Meta','Tab','CapsLock','Escape'].includes(e.key)) return;
+        e.preventDefault();
+        press();
       };
       window.addEventListener('keydown', keyH);
-      window.addEventListener('keyup', keyH);
       keyHandler = keyH;
 
-      // decay ramps up with level so you can't just tap once and coast
-      const decayPerSec = 9 + level * 1.4;
-      let last = performance.now();
+      // decay ramps up with level so you can't just tap once and coast.
+      // (This is one of two difficulty knobs now -- see the pool entry
+      // below for the other, the time limit -- so it doesn't need to carry
+      // the whole scaling curve by itself anymore.)
+      const decayPerSec = 8 + level * 0.7;
       decayTimer = setInterval(() => {
         if (done) return;
         pct = Math.max(0, pct - decayPerSec * 0.1);
@@ -493,151 +704,13 @@
     function cleanup() {
       done = true;
       clearInterval(decayTimer);
-      if (keyH) { window.removeEventListener('keydown', keyH); window.removeEventListener('keyup', keyH); }
-    }
-    return { init, cleanup };
-  }
-
-  function avoidCreeperGame() {
-    let container, onResult, done, player, px, py, keys, raf, w, h, enemies;
-    function init(c, duration, cb, level) {
-      container = c; onResult = cb; done = false;
-      level = level || 1;
-      const secondCreeper = level >= 4;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">RUN FROM THE CREEPER'+(secondCreeper?'S':'')+'! (WASD/Arrows)</div><div id="creeperArena"></div><div id="creeperPlayer"></div></div>';
-      const arena = c.querySelector('#creeperArena');
-      player = c.querySelector('#creeperPlayer');
-      w = c.clientWidth; h = c.clientHeight;
-      px = w*0.3; py = h*0.6;
-
-      enemies = [{ x: w*0.7, y: h*0.3, el: document.createElement('div') }];
-      enemies[0].el.id = 'creeperEnemy';
-      enemies[0].el.textContent = '👹';
-      arena.appendChild(enemies[0].el);
-      if (secondCreeper) {
-        const e2 = { x: w*0.2, y: h*0.75, el: document.createElement('div') };
-        e2.el.className = 'creeperEnemy2';
-        e2.el.textContent = '🧟';
-        arena.appendChild(e2.el);
-        enemies.push(e2);
-      }
-
-      keys = {};
-      keyHandler = (e) => {
-        if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s'].includes(e.key)) e.preventDefault();
-        keys[e.key] = (e.type === 'keydown');
-      };
-      window.addEventListener('keydown', keyHandler);
-      window.addEventListener('keyup', keyHandler);
-
-      const speed = 260; // player movement speed
-      const baseSpeed = 90 + level*7;
-      const start = performance.now();
-      let last = start;
-      function loop(t) {
-        if (done) return;
-        const dt = Math.min(0.05, (t-last)/1000); last = t;
-        const elapsed = (t - start) / 1000;
-        // speed ramps up through the round but is always capped below the
-        // player's own speed -- a pursuer that's ever faster than the player
-        // can corner them for a guaranteed catch, which isn't a fair fail.
-        // Staying under player speed keeps evasion always mathematically
-        // possible (just harder to execute) at every level.
-        const rampFactor = 1 + Math.min(0.4, elapsed * 0.14);
-        const enemySpeed = Math.min(baseSpeed * rampFactor, speed * 0.86);
-
-        if (keys['ArrowLeft']||keys['a']) px -= speed*dt;
-        if (keys['ArrowRight']||keys['d']) px += speed*dt;
-        if (keys['ArrowUp']||keys['w']) py -= speed*dt;
-        if (keys['ArrowDown']||keys['s']) py += speed*dt;
-        px = Math.max(10, Math.min(w-40, px));
-        py = Math.max(10, Math.min(h-40, py));
-        player.style.left = px+'px'; player.style.top = py+'px';
-
-        for (const en of enemies) {
-          const dx = px-en.x, dy = py-en.y;
-          const dist = Math.hypot(dx,dy) || 1;
-          en.x += (dx/dist)*enemySpeed*dt;
-          en.y += (dy/dist)*enemySpeed*dt;
-          en.x = Math.max(0, Math.min(w-44, en.x));
-          en.y = Math.max(0, Math.min(h-44, en.y));
-          en.el.style.left = en.x+'px'; en.el.style.top = en.y+'px';
-          if (dist < 34) { done = true; onResult(false); return; }
-        }
-        raf = requestAnimationFrame(loop);
-      }
-      raf = requestAnimationFrame(loop);
-      init._succeedFn = () => { if (!done) { done = true; onResult(true); } };
-    }
-    function cleanup() {
-      done = true;
-      cancelAnimationFrame(raf);
-      if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
-    }
-    return { init, cleanup, get onTimeoutSuccess() { return true; } };
-  }
-
-  function catchGame() {
-    let container, onResult, done, basket, bx, keys, raf, arena, coin, w, h;
-    function init(c, duration, cb, level) {
-      container = c; onResult = cb; done = false;
-      level = level || 1;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CATCH THE COIN! (←/→ or A/D)</div><div id="catchArena"></div><div id="catchBasket">🧺</div></div>';
-      arena = c.querySelector('#catchArena');
-      basket = c.querySelector('#catchBasket');
-      w = c.clientWidth; h = c.clientHeight;
-      bx = w/2;
-      basket.style.left = bx+'px';
-      keys = {};
-      keyHandler = (e) => {
-        if (['ArrowLeft','ArrowRight','a','d'].includes(e.key)) e.preventDefault();
-        keys[e.key] = (e.type === 'keydown');
-      };
-      window.addEventListener('keydown', keyHandler);
-      window.addEventListener('keyup', keyHandler);
-
-      const x = rand(30, w-30);
-      const el = document.createElement('div');
-      el.className = 'fallItem';
-      el.textContent = '🪙';
-      el.style.left = x+'px';
-      el.style.top = '-30px';
-      arena.appendChild(el);
-      coin = { el, x, y: -30, vy: rand(95, 130) + level*4 };
-
-      let last = performance.now();
-      function loop(t) {
-        if (done) return;
-        const dt = Math.min(0.05, (t-last)/1000); last = t;
-        const speed = 380;
-        if (keys['ArrowLeft']||keys['a']) bx -= speed*dt;
-        if (keys['ArrowRight']||keys['d']) bx += speed*dt;
-        bx = Math.max(20, Math.min(w-20, bx));
-        basket.style.left = bx+'px';
-
-        coin.y += coin.vy*dt;
-        coin.el.style.top = coin.y+'px';
-
-        if (coin.y > h*0.62 && Math.abs(coin.x-bx) < 55) {
-          done = true; onResult(true); return;
-        }
-        if (coin.y > h+40) {
-          done = true; onResult(false); return;
-        }
-        raf = requestAnimationFrame(loop);
-      }
-      raf = requestAnimationFrame(loop);
-    }
-    function cleanup() {
-      done = true;
-      cancelAnimationFrame(raf);
-      if (keyHandler) { window.removeEventListener('keydown', keyHandler); window.removeEventListener('keyup', keyHandler); keyHandler = null; }
+      if (keyH) { window.removeEventListener('keydown', keyH); }
     }
     return { init, cleanup };
   }
 
   function reactionArrowGame() {
-    let done, keyH;
+    let done, keyH, seqIdx, seq, arrowEls;
     const dirs = [
       { key:'ArrowUp', alt:'w', symbol:'⬆️' },
       { key:'ArrowDown', alt:'s', symbol:'⬇️' },
@@ -646,14 +719,26 @@
     ];
     function init(c, duration, cb) {
       done = false;
-      const target = pick(dirs);
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">PRESS THE MATCHING ARROW!</div><div id="reactionArrow">'+target.symbol+'</div></div>';
+      seqIdx = 0;
+      // single arrow -- just press the one shown, fast
+      const first = pick(dirs);
+      seq = [first];
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">PRESS THE ARROW!</div>'
+        + '<div id="reactionArrowSeq" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; gap:24px;">'
+        + '<span class="reactionArrowStep" data-i="0" style="font-size:16vmin; opacity:1;">'+first.symbol+'</span>'
+        + '</div></div>';
+      arrowEls = Array.from(c.querySelectorAll('.reactionArrowStep'));
       keyH = (e) => {
         if (done) return;
         if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(e.key)) return;
         e.preventDefault();
-        done = true;
-        cb(e.key === target.key || e.key === target.alt);
+        const target = seq[seqIdx];
+        const correct = (e.key === target.key || e.key === target.alt);
+        if (!correct) { done = true; cb(false); return; }
+        arrowEls[seqIdx].style.opacity = '0.15';
+        seqIdx++;
+        if (seqIdx >= seq.length) { done = true; cb(true); return; }
+        arrowEls[seqIdx].style.opacity = '1';
       };
       window.addEventListener('keydown', keyH);
       keyHandler = keyH;
@@ -665,57 +750,27 @@
     return { init, cleanup };
   }
 
-  function quickMathGame() {
-    let done, detachNav;
-    function init(c, duration, cb, level) {
-      done = false;
-      level = level || 1;
-      const maxNum = 8 + level*2;
-      const a = Math.floor(rand(2, maxNum));
-      const b = Math.floor(rand(1, maxNum));
-      const op = pick(['+','-']);
-      const answer = op === '+' ? a+b : a-b;
-      const opts = new Set([answer]);
-      let guard = 0;
-      while (opts.size < 3 && guard < 20) {
-        guard++;
-        const delta = Math.floor(rand(-5,5)) || 1;
-        opts.add(answer + delta);
-      }
-      const arr = [...opts].sort(() => Math.random()-0.5);
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">SOLVE IT FAST!</div><div id="mathEq">'+a+' '+op+' '+b+' = ?</div><div id="mathOpts"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
-      const optsEl = c.querySelector('#mathOpts');
-      const btns = arr.map(val => {
-        const btn = document.createElement('button');
-        btn.className = 'mathOptBtn';
-        btn.textContent = val;
-        btn.addEventListener('click', () => select(val));
-        optsEl.appendChild(btn);
-        return btn;
-      });
-      function select(val) {
-        if (done) return; done = true;
-        cb(val === answer);
-      }
-      detachNav = attachArrowGridNav(btns, btns.length, (idx) => select(arr[idx]));
-    }
-    function cleanup() { done = true; if (detachNav) detachNav(); }
-    return { init, cleanup };
-  }
-
   function spotDiffGame() {
     let container, onResult, done, detachNav;
-    function init(c, duration, cb) {
+    function init(c, duration, cb, level) {
       container = c; onResult = cb; done = false;
+      level = level || 1;
       const cells = 49;
       const baseHue = Math.floor(rand(0,360));
       const baseSat = 55, baseLight = 52;
       const color = `hsl(${baseHue},${baseSat}%,${baseLight}%)`;
-      const diffMode = Math.random() < 0.5 ? 'light' : 'hue';
+      // This used to be a fixed-contrast puzzle with no level input at all --
+      // the only thing that changed at higher levels was the timer, not the
+      // actual difficulty of spotting the odd cell out. Now the contrast
+      // itself shrinks with level, so the puzzle really does get harder to
+      // see, not just more rushed.
+      const lightDelta = Math.max(6.5, 23.4 - level*0.65);
+      const hueDelta = Math.max(13, 41.6 - level*1.3);
+      const diffMode = rngFn() < 0.5 ? 'light' : 'hue';
       const diffColor = diffMode === 'light'
-        ? `hsl(${baseHue},${baseSat}%,${baseLight + (Math.random()<0.5?-9:9)}%)`
-        : `hsl(${(baseHue+18)%360},${baseSat}%,${baseLight}%)`;
-      const diffIdx = Math.floor(Math.random()*cells);
+        ? `hsl(${baseHue},${baseSat}%,${baseLight + (rngFn()<0.5?-1:1)*lightDelta}%)`
+        : `hsl(${(baseHue+hueDelta)%360},${baseSat}%,${baseLight}%)`;
+      const diffIdx = Math.floor(rngFn()*cells);
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">FIND THE ODD ONE OUT!</div><div class="diffGrid"><div class="diffBoard" id="board"></div></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
       const board = c.querySelector('#board');
       const cellEls = [];
@@ -738,25 +793,37 @@
   }
 
   function stopBarGame() {
-    let done, raf, keyH, clickH, w, zoneX, zoneWidth, pos, dir, speed, gaugeEl, markerEl, zoneEl;
+    let done, raf, keyH, clickH, w, zoneX, zoneWidth, pos, dir, speed, gaugeEl, markerEl, zoneEl, passCount, wasInZone, lastDanger;
     function init(c, duration, cb, level) {
       done = false;
       level = level || 1;
+      passCount = 0;
+      wasInZone = false;
+      lastDanger = 0;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">STOP IT IN THE GREEN!</div><div id="gaugeWrap"><div id="gaugeZone"></div><div id="gaugeMarker"></div></div><div id="gaugeHint">PRESS SPACE (OR TAP)</div></div>';
       gaugeEl = c.querySelector('#gaugeWrap');
       zoneEl = c.querySelector('#gaugeZone');
       markerEl = c.querySelector('#gaugeMarker');
       w = gaugeEl.clientWidth;
       speed = 220 + level*30;
-      // Guarantee the marker spends at least ~200ms inside the zone (human press
-      // reaction/precision floor) no matter how fast it's moving, so every level
-      // stays physically beatable rather than becoming a coinflip.
-      const minCrossSec = 0.2;
-      zoneWidth = Math.min(w*0.4, Math.max(speed*minCrossSec, w*0.09));
+      // The old rule guaranteed a minimum *time* inside the zone by growing
+      // the zone with speed -- which meant at high level (high speed) the
+      // zone ballooned up to 40% of the track, making the game easier the
+      // faster the marker moved. Zone size is now purely level-based and
+      // only ever shrinks with level, independent of speed.
+      zoneWidth = Math.max(w*0.08, w*(0.24 - level*0.007));
       zoneX = rand(0, w - zoneWidth);
       zoneEl.style.left = zoneX+'px';
       zoneEl.style.width = zoneWidth+'px';
-      pos = rand(0, w-8); dir = Math.random()<0.5?1:-1;
+      // Spawn at whichever track edge is farthest from the zone -- otherwise
+      // a random spawn point could land right next to the zone with barely
+      // any travel distance before it, which at high speed leaves almost no
+      // time to react on the very first pass.
+      const zoneCenter = zoneX + zoneWidth/2;
+      const distIfLeft = zoneCenter - 0;
+      const distIfRight = (w-8) - zoneCenter;
+      if (distIfLeft >= distIfRight) { pos = 0; dir = 1; }
+      else { pos = w-8; dir = -1; }
       let last = performance.now();
       function loop(t) {
         if (done) return;
@@ -765,13 +832,34 @@
         if (pos < 0) { pos = 0; dir = 1; }
         if (pos > w-8) { pos = w-8; dir = -1; }
         markerEl.style.left = pos+'px';
+        const markerCenter = pos+4;
+        const inZone = markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth;
+        // No timer, no timeout fail -- instead, the marker gets exactly two
+        // free passes through the zone. Miss your chance to click during a
+        // pass and it costs you one of those two; run out of passes and
+        // that's the fail, whether or not you were ever going to click.
+        if (wasInZone && !inZone) {
+          passCount++;
+          if (passCount >= 2) { done = true; lastDanger = 1; cb(false); return; }
+        }
+        wasInZone = inZone;
         raf = requestAnimationFrame(loop);
       }
       raf = requestAnimationFrame(loop);
       function attempt() {
         if (done) return; done = true;
         const markerCenter = pos+4;
-        cb(markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth);
+        const inZone = markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth;
+        if (inZone) {
+          // Clicking during the very first pass is a clean win. Letting it
+          // go by once and catching it on the second pass still wins, but
+          // it's the riskier of the two -- you were one miss from a fail.
+          lastDanger = passCount >= 1 ? 0.5 : 0;
+          cb(true);
+        } else {
+          lastDanger = 1;
+          cb(false);
+        }
       }
       keyH = (e) => { if (e.code === 'Space') { e.preventDefault(); attempt(); } };
       clickH = () => attempt();
@@ -783,7 +871,8 @@
       cancelAnimationFrame(raf);
       if (keyH) window.removeEventListener('keydown', keyH);
     }
-    return { init, cleanup };
+    function getDanger() { return lastDanger; }
+    return { init, cleanup, getDanger };
   }
 
   function simonFlashGame() {
@@ -792,7 +881,15 @@
     function init(c, duration, cb, level) {
       done = false;
       level = level || 1;
-      const len = Math.min(4, 3 + Math.floor(level/3));
+      // Sequence length used to cap at 5 by level 10 (3 + floor(level/5),
+      // capped at 5) -- meaning levels 10-20+ were all functionally
+      // identical in length, with only flashSpeed doing any scaling (and
+      // that also bottomed out its floor right around level 20). Both knobs
+      // now keep climbing much further before hitting their floors/ceilings.
+      // Cap length at 5 -- past level ~6 the challenge comes entirely from
+      // flashSpeed (faster playback), not from asking you to remember more
+      // items than a person actually can.
+      const len = Math.min(5, 3 + Math.floor(level/3));
       sequence = Array.from({length: len}, () => Math.floor(rand(0,4)));
       playerIdx = 0;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
@@ -808,15 +905,20 @@
       detachNav = attachArrowGridNav(tiles, 2, onTileClick);
       let accepting = false;
       let i = 0;
-      const flashSpeed = Math.max(280, 520 - level*20);
+      const flashSpeed = Math.max(180, 545 - level*14);
       function playStep() {
         if (done) return;
         if (i >= sequence.length) { accepting = true; return; }
         const idx = sequence[i];
         tiles[idx].classList.add('lit');
+        const numEl = document.createElement('span');
+        numEl.className = 'simonNumber';
+        numEl.textContent = i + 1;
+        tiles[idx].appendChild(numEl);
         setTimeout(() => {
           if (done) return;
           tiles[idx].classList.remove('lit');
+          if (numEl.parentNode) numEl.parentNode.removeChild(numEl);
           i++;
           setTimeout(playStep, flashSpeed*0.35);
         }, flashSpeed*0.65);
@@ -825,7 +927,14 @@
       function onTileClick(idx) {
         if (done || !accepting) return;
         tiles[idx].classList.add('lit');
-        setTimeout(() => { if (tiles[idx]) tiles[idx].classList.remove('lit'); }, 150);
+        const numEl = document.createElement('span');
+        numEl.className = 'simonNumber';
+        numEl.textContent = playerIdx + 1;
+        tiles[idx].appendChild(numEl);
+        setTimeout(() => {
+          if (tiles[idx]) tiles[idx].classList.remove('lit');
+          if (numEl.parentNode) numEl.parentNode.removeChild(numEl);
+        }, 150);
         if (idx !== sequence[playerIdx]) { done = true; cb(false); return; }
         playerIdx++;
         if (playerIdx >= sequence.length) { done = true; cb(true); }
@@ -836,34 +945,37 @@
   }
 
   function balanceGame() {
-    let done, raf, keyH, keys, angle, dotPos, vel, w, h, platform, dot, windTarget, windTimer;
+    let done, raf, keyH, keys, angle, dotPos, vel, w, h, platform, dot, maxAbsDotPos, windTarget, windTimer;
     function init(c, duration, cb, level) {
       done = false;
       level = level || 1;
       keys = {};
+      maxAbsDotPos = 0;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">KEEP IT BALANCED!</div><div id="balanceZone"></div><div id="balancePlatform"></div><div id="balanceDot"></div></div>';
       platform = c.querySelector('#balancePlatform');
       dot = c.querySelector('#balanceDot');
       w = c.clientWidth; h = c.clientHeight;
+      // Difficulty comes from stronger gravity (the ball accelerates faster
+      // off-level), twitchier controls (less precise tilt authority per
+      // keypress), and an ambient "wind" that keeps nudging the platform
+      // toward a shifting random angle -- so standing still is never a
+      // valid strategy and you can't just memorize a fixed rhythm.
       const tiltSpeed = 60 + level*4;
-      const gravity = 1.0 + level*0.08;
-      // ambient "wind" keeps nudging the platform toward a shifting random angle,
-      // so standing still is never a valid strategy -- you always have to react.
-      const windAmp = 14 + level*1.4;
-      const windPull = 0.9 + level*0.03;
+      const gravity = 1.0 + level*0.16;
+      const windAmp = 8 + level*2.2;
+      const windPull = 0.9 + level*0.05;
       windTarget = rand(-windAmp, windAmp);
-      // start already tilted toward the first wind target (with a bit of initial
-      // roll speed) so the ball is visibly moving the instant the round begins,
-      // instead of sitting still for the first fraction of a second.
-      angle = windTarget * 0.5;
-      dotPos = 0; vel = (windTarget/35) * gravity * 0.15;
+      // start perfectly level and at rest -- any drift from here on is
+      // driven by the wind plus the player's own input.
+      angle = 0;
+      dotPos = 0; vel = 0;
       keyH = (e) => {
         if (['ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
         keys[e.key] = (e.type === 'keydown');
       };
       window.addEventListener('keydown', keyH);
       window.addEventListener('keyup', keyH);
-      windTimer = setInterval(() => { windTarget = rand(-windAmp, windAmp); }, Math.max(650, 1400 - level*35));
+      windTimer = setInterval(() => { windTarget = rand(-windAmp, windAmp); }, Math.max(500, 1400 - level*55));
       let last = performance.now();
       function loop(t) {
         if (done) return;
@@ -871,14 +983,20 @@
         angle += (windTarget - angle) * windPull * dt;
         if (keys['ArrowLeft']) angle -= tiltSpeed*dt;
         if (keys['ArrowRight']) angle += tiltSpeed*dt;
-        angle = Math.max(-35, Math.min(35, angle));
-        vel += (angle/35) * gravity * dt;
+        angle = Math.max(-28, Math.min(28, angle));
+        vel += (angle/28) * gravity * dt;
         vel *= 0.995;
         dotPos += vel*dt;
         dotPos = Math.max(-1.15, Math.min(1.15, dotPos));
+        if (Math.abs(dotPos) > maxAbsDotPos) maxAbsDotPos = Math.abs(dotPos);
         platform.style.transform = 'translate(-50%,-50%) rotate('+angle+'deg)';
         const rad = angle*Math.PI/180;
-        const half = w*0.31;
+        // dotPos can range up to +/-1.15 before it's a true fail, so scale the
+        // visual travel by that same max so the ball stays visibly on the
+        // platform for its entire recoverable range, only truly popping off
+        // right at the actual fail threshold instead of looking "off the
+        // stick" while still recoverable.
+        const half = (platform.clientWidth/2) / 1.15;
         const dx = Math.cos(rad)*dotPos*half;
         const dy = Math.sin(rad)*dotPos*half;
         dot.style.left = (w/2 + dx - 13) + 'px';
@@ -894,16 +1012,20 @@
       clearInterval(windTimer);
       if (keyH) { window.removeEventListener('keydown', keyH); window.removeEventListener('keyup', keyH); }
     }
-    return { init, cleanup, get onTimeoutSuccess() { return true; } };
+    function getDanger() {
+      return clamp01(maxAbsDotPos / 1.15);
+    }
+    return { init, cleanup, getDanger, get onTimeoutSuccess() { return true; } };
   }
 
   function trueReactionGame() {
-    let done, delayTimeout, windowTimeout, btn, fillEl, promptEl, windowMs, state;
+    let done, delayTimeout, windowTimeout, btn, fillEl, promptEl, windowMs, state, keyH, lastDanger, greenStart;
     function init(c, duration, cb, level) {
       done = false;
       level = level || 1;
       state = 'red';
-      windowMs = Math.max(260, 1300 - level*130);
+      lastDanger = 0;
+      windowMs = Math.max(165, 1430 - level*55);
       const delayMs = rand(700, 1900);
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt" id="reactPrompt">WAIT FOR GREEN!</div><div id="reactWindowBar"><div id="reactWindowFill"></div></div><button id="reactBtn">WAIT...</button></div>';
       btn = c.querySelector('#reactBtn');
@@ -913,16 +1035,39 @@
       fillEl.style.width = '100%';
       btn.style.background = '#d8324a';
       btn.style.borderColor = '#6e0f1e';
-      btn.addEventListener('click', () => {
+      function press() {
         if (done) return;
         if (state === 'red') { done = true; clearTimeout(delayTimeout); cb(false); return; }
         done = true;
         clearTimeout(windowTimeout);
+        // How much of the (level-shrunk) reaction window was already burned
+        // before you clicked -- this is the real difficulty signal. The old
+        // fallback measured elapsed/duration against a fixed noShrink
+        // duration, which was mostly just measuring the random pre-green
+        // delay and barely moved with level even though windowMs itself was
+        // scaling hard.
+        const usedMs = performance.now() - greenStart;
+        lastDanger = clamp01(usedMs / windowMs);
+        // freeze the fill exactly where it is instead of letting the CSS
+        // transition keep shrinking after the press -- gives honest visual
+        // feedback of how precise the click was.
+        const currentWidthPx = fillEl.getBoundingClientRect().width;
+        fillEl.style.transition = 'none';
+        fillEl.style.width = currentWidthPx + 'px';
         cb(true);
-      });
+      }
+      btn.addEventListener('click', press);
+      keyH = (e) => {
+        if (e.code !== 'Space') return;
+        e.preventDefault();
+        press();
+      };
+      window.addEventListener('keydown', keyH);
+      keyHandler = keyH;
       delayTimeout = setTimeout(() => {
         if (done) return;
         state = 'green';
+        greenStart = performance.now();
         promptEl.textContent = 'CLICK NOW!';
         btn.textContent = 'CLICK!';
         btn.style.background = '#2ea043';
@@ -941,44 +1086,241 @@
         }, windowMs);
       }, delayMs);
     }
-    function cleanup() { done = true; clearTimeout(delayTimeout); clearTimeout(windowTimeout); }
-    return { init, cleanup };
+    function cleanup() {
+      done = true;
+      clearTimeout(delayTimeout);
+      clearTimeout(windowTimeout);
+      if (keyH) { window.removeEventListener('keydown', keyH); keyH = null; }
+    }
+    function getDanger() { return lastDanger; }
+    return { init, cleanup, getDanger };
   }
 
   // ---------- MAIN GAME LOOP ----------
   function computeDuration(entry, level, container) {
     if (entry.getDuration) return entry.getDuration(level, container);
-    return entry.noShrink ? entry.baseDuration : Math.max(1.4, entry.baseDuration - (level-1)*0.22);
+    if (entry.noShrink) return entry.baseDuration;
+    const shrinkRate = entry.shrinkRate != null ? entry.shrinkRate : 0.22;
+    const minDuration = entry.minDuration != null ? entry.minDuration : 1.4;
+    return Math.max(minDuration, entry.baseDuration - (level-1)*shrinkRate);
   }
   const commands = ['CLICK!','DODGE!','TYPE!','MASH!','RESIST!','SPOT IT!'];
   const microgamePool = [
-    { name:'click', factory: colorClickGame, cmd:'CLICK!', baseDuration: 3.2 },
-    { name:'dodge', factory: dodgeGame, cmd:'DODGE!', baseDuration: 3.6 },
-    { name:'type', factory: typeGame, cmd:'TYPE!', baseDuration: 4.2 },
-    { name:'mash', factory: mashGame, cmd:'MASH!', baseDuration: 3.6 },
-    { name:'creeper', factory: avoidCreeperGame, cmd:'RUN!', baseDuration: 3.6 },
-    { name:'spot', factory: spotDiffGame, cmd:'SPOT IT!', baseDuration: 4.0 },
-    { name:'catch', factory: catchGame, cmd:'CATCH!', baseDuration: 12, noShrink: true, hideTimer: true },
-    { name:'reaction', factory: reactionArrowGame, cmd:'REACT!', baseDuration: 1.8 },
-    { name:'math', factory: quickMathGame, cmd:'SOLVE!', baseDuration: 3.2 },
-    { name:'stopbar', factory: stopBarGame, cmd:'STOP IT!', baseDuration: 4.0,
+    { name:'click', factory: colorClickGame, cmd:'CLICK!', baseDuration: 4.6, shrinkRate: 0.34, minDuration: 0.9 },
+    { name:'dodge', factory: dodgeGame, cmd:'DODGE!', baseDuration: 4.4, noShrink: true },
+    { name:'type', factory: typeGame, cmd:'TYPE!', baseDuration: 5.57, shrinkRate: 0.2, minDuration: 1.87 },
+    { name:'mash', factory: mashGame, cmd:'MASH!', baseDuration: 3.6, shrinkRate: 0.11, minDuration: 1.6 },
+    { name:'spot', factory: spotDiffGame, cmd:'SPOT IT!', baseDuration: 5.5, shrinkRate: 0.15, minDuration: 2.6 },
+    { name:'reaction', factory: reactionArrowGame, cmd:'REACT!', baseDuration: 1.9, shrinkRate: 0.06, minDuration: 0.9 },
+    { name:'stopbar', factory: stopBarGame, cmd:'STOP IT!', baseDuration: 4.0, hideTimer: true,
       getDuration: (level, container) => {
-        const w = (container ? container.clientWidth : 400) * 0.8; // #gaugeWrap is left/right:10%
+        // Use a fixed reference width rather than the live container's
+        // clientWidth. This value feeds into the round's timing slot
+        // (see slotMs in runMicrogame), so it must be identical on every
+        // machine for synced-seed play -- if it were derived from the
+        // actual on-screen pixel width, two players with different screen
+        // sizes would compute different slot lengths and drift out of
+        // sync over a long match. REFERENCE_STAGE_WIDTH is an arbitrary
+        // fixed stand-in for "typical stage width", not a measurement.
+        const REFERENCE_STAGE_WIDTH = 400;
+        const w = REFERENCE_STAGE_WIDTH * 0.8; // #gaugeWrap is left/right:10%
         const speed = 220 + level*30;
-        // Worst case the marker starts at one end moving away from the zone at the
-        // other end: it has to cross the whole track, bounce, and cross back before
-        // it can ever enter the zone -- that's up to 2*w of travel. Guarantee enough
-        // time for that full worst-case approach plus a real reaction window once
-        // it arrives, so every level stays winnable no matter how bad the start is.
-        const worstApproachSec = (2*w) / speed;
-        const reactionBufferSec = 0.9;
-        return Math.max(2.2, worstApproachSec + reactionBufferSec);
+        // No visible timer and no time-based fail anymore -- the game now
+        // ends on its own via the two-pass rule or a click. This duration is
+        // purely a safety-net cap in case something ever stalls, so it's
+        // sized generously for a worst-case double crossing rather than
+        // tuned as a real difficulty knob.
+        const worstCaseSec = (5*w) / speed;
+        return Math.max(4, worstCaseSec + 1.5);
       }
     },
-    { name:'simon', factory: simonFlashGame, cmd:'REPEAT!', baseDuration: 9.5, noShrink: true },
-    { name:'balance', factory: balanceGame, cmd:'BALANCE!', baseDuration: 4.5 },
-    { name:'reacttest', factory: trueReactionGame, cmd:'REACT!', baseDuration: 3.4, noShrink: true, hideTimer: true },
+    { name:'simon', factory: simonFlashGame, cmd:'REPEAT!', baseDuration: 6.175, noShrink: true },
+    { name:'balance', factory: balanceGame, cmd:'BALANCE!', baseDuration: 4.8, noShrink: true },
+    { name:'reacttest', factory: trueReactionGame, cmd:'REACT!', baseDuration: 3.74, noShrink: true, hideTimer: true },
   ];
+
+  // ---------- SEEDED ROUND PLAN (synced-seed play) ----------
+  // Generates the full sequence of rounds -- which minigame, and what level
+  // it's played at -- as one deterministic pass over the seeded RNG, before
+  // any round actually starts. Two machines seeded identically call this
+  // with the same seed and round count and get back the identical plan,
+  // in the identical order.
+  //
+  // Note: level here is a pure function of round index, not of streak/lives
+  // like normal solo play. It has to be -- if level depended on how well
+  // *this* player is doing, two players could end up seeing different
+  // rounds at the same round number, which defeats the sync entirely. This
+  // only matters when a seeded plan is active; ordinary solo play is
+  // untouched and keeps its old adaptive streak-based leveling.
+  function generateRoundPlan(seedValue, numRounds, planStartLevel) {
+    seedRng(seedValue);
+    planStartLevel = planStartLevel || 1;
+    const plan = [];
+    let lastName = null;
+    for (let i = 0; i < numRounds; i++) {
+      const lvl = Math.min(20, planStartLevel + Math.floor(i / 3));
+      const pool = microgamePool.filter(g => g.name !== lastName);
+      const entry = pick(pool.length ? pool : microgamePool);
+      lastName = entry.name;
+      plan.push({ entry, level: lvl });
+    }
+    // rngFn is left seeded and mid-stream on purpose: each round's own
+    // internal randomness (simon's sequence, stopbar's zone, etc.) is drawn
+    // live when that round actually runs, continuing from exactly where
+    // plan generation left off -- so it's just as deterministic as the plan
+    // itself, without needing to be pre-computed and stored here too.
+    return plan;
+  }
+
+  // ---------- ROOM / SYNCED-SEED PLAY ----------
+  // A "room" is just a URL: ?seed=...&start=...&lvl=... . Opening that URL
+  // is all that's needed to join -- there's no server involved, so the link
+  // itself IS the invite. seed determines the round plan (which games, what
+  // order, what internal content). start is an absolute Unix timestamp (ms)
+  // both machines count down to independently using their own clock. lvl is
+  // the chosen room difficulty (1/10/20), baked into the plan generation.
+  let seededPlan = null;
+  let seededRoundIdx = 0;
+  let roomStartTime = null;
+  let roomStartLevelChosen = 1;
+  let lobbyInterval = null;
+  let currentRoomSeed = null;
+
+  // ---------- FIXED-DURATION ROUND SCHEDULE (synced-seed play) ----------
+  // Round N always occupies the same absolute wall-clock slot on every
+  // machine playing the same room: [roomStartTime + sum of previous slot
+  // lengths, ... + this round's slot length]. A slot is the command slam
+  // (COMMAND_SLAM_MS), the microgame's own duration, then the result pause
+  // (RESULT_PAUSE_MS). Winning or losing early no longer advances early --
+  // handleRoundEnd waits out whatever is left of the scheduled slot before
+  // calling nextRound(), so both clients stay on the same round at the same
+  // time regardless of how quickly either of them wins or loses.
+  const COMMAND_SLAM_MS = 420;
+  const RESULT_PAUSE_MS = 550;
+  let roundScheduledStart = null; // absolute Date.now()-based ms, seeded play only
+  let roundScheduledEnd = null;   // absolute Date.now()-based ms for the round in progress
+
+  // ---------- MATCH HISTORY (for the end-of-match summary/compare) ----------
+  let isRoomMatch = false;
+  let matchHistory = []; // [{round, name, cmd, level, success}, ...]
+
+  function buildRoomLink(seedValue, startTimeMs, lvl) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('seed', seedValue);
+    url.searchParams.set('start', String(startTimeMs));
+    url.searchParams.set('lvl', String(lvl));
+    return url.toString();
+  }
+
+  function makeRoomSeed() {
+    // Long, unique-enough seed: current time plus a random suffix. Room
+    // seeds can be as long as we like since they just get hashed down to
+    // the PRNG's starting state -- so baking the creation time into the
+    // string costs nothing and helps make two different rooms created back
+    // to back never accidentally collide.
+    return Date.now().toString(36) + '-' + Math.floor(rngFn() * 1e9).toString(36);
+  }
+
+  function openRoomDiffMenu() {
+    centerMenu.style.display = 'none';
+    roomDiffMenu.style.display = 'flex';
+  }
+  function createRoom(lvl) {
+    roomDiffMenu.style.display = 'none';
+    const seedValue = makeRoomSeed();
+    // Give whoever's sending the link a couple minutes to actually send it
+    // and have the other person open it before the countdown runs out.
+    const startTimeMs = Date.now() + 120000;
+    roomLinkText.value = buildRoomLink(seedValue, startTimeMs, lvl);
+    roomLinkMenu.style.display = 'flex';
+    roomLinkMenu.dataset.seed = seedValue;
+    roomLinkMenu.dataset.start = String(startTimeMs);
+    roomLinkMenu.dataset.lvl = String(lvl);
+  }
+
+  function lobbyTick() {
+    const msLeft = roomStartTime - Date.now();
+    if (msLeft <= 0) {
+      if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
+      lobbyScreen.style.display = 'none';
+      startGame(roomStartLevelChosen);
+      return;
+    }
+    lobbyCountdown.textContent = (msLeft / 1000).toFixed(1) + 's';
+  }
+
+  function enterLobby(seedValue, startTimeMs, lvl) {
+    [centerMenu, difficultyMenu, roomDiffMenu, roomLinkMenu].forEach(el => el.style.display = 'none');
+    seededPlan = generateRoundPlan(seedValue, 200, lvl);
+    seededRoundIdx = 0;
+    currentRoomSeed = seedValue;
+    roomStartTime = startTimeMs;
+    roomStartLevelChosen = lvl;
+    lobbyScreen.style.display = 'flex';
+    lobbyTick();
+    lobbyInterval = setInterval(lobbyTick, 100);
+  }
+
+  function leaveRoom() {
+    if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
+    seededPlan = null;
+    seededRoundIdx = 0;
+    currentRoomSeed = null;
+    lobbyScreen.style.display = 'none';
+    matchSummaryScreen.style.display = 'none';
+    // Drop the room params so a refresh/back doesn't drop you right back in.
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url.toString());
+    centerMenu.style.display = 'flex';
+  }
+
+  friendBtn.addEventListener('click', openRoomDiffMenu);
+  roomEasyBtn.addEventListener('click', () => createRoom(1));
+  roomMediumBtn.addEventListener('click', () => createRoom(10));
+  roomHardBtn.addEventListener('click', () => createRoom(20));
+  roomDiffCancelBtn.addEventListener('click', () => {
+    roomDiffMenu.style.display = 'none';
+    centerMenu.style.display = 'flex';
+  });
+  roomCopyBtn.addEventListener('click', () => {
+    roomLinkText.select();
+    navigator.clipboard?.writeText(roomLinkText.value).catch(() => {});
+    roomCopyBtn.textContent = 'COPIED!';
+    setTimeout(() => { roomCopyBtn.textContent = 'COPY LINK'; }, 1200);
+  });
+  roomEnterLobbyBtn.addEventListener('click', () => {
+    enterLobby(roomLinkMenu.dataset.seed, Number(roomLinkMenu.dataset.start), Number(roomLinkMenu.dataset.lvl));
+  });
+  roomLinkBackBtn.addEventListener('click', () => {
+    roomLinkMenu.style.display = 'none';
+    centerMenu.style.display = 'flex';
+  });
+  lobbyLeaveBtn.addEventListener('click', leaveRoom);
+  lobbyMinus15Btn.addEventListener('click', () => {
+    if (roomStartTime == null) return;
+    // Purely local: this doesn't tell the other machine anything. It stays
+    // "synced" only because subtracting the same fixed 15s from the same
+    // shared roomStartTime keeps both machines' targets equal to each other
+    // -- as long as both players press it the same number of times. There's
+    // no way to enforce that without a server, so it's on the players to
+    // agree out loud.
+    roomStartTime -= 15000;
+    lobbyTick();
+  });
+
+  // If this page was opened via a room link, skip the menu entirely and go
+  // straight into the synced lobby using the params baked into the URL.
+  (function checkRoomParams() {
+    const params = new URLSearchParams(window.location.search);
+    const seedParam = params.get('seed');
+    const startParam = params.get('start');
+    if (seedParam && startParam) {
+      const lvl = Math.max(1, Math.min(20, parseInt(params.get('lvl'), 10) || 1));
+      enterLobby(seedParam, parseInt(startParam, 10), lvl);
+    }
+  })();
 
   // ---------- TEST MODE ----------
   function buildTestMenu() {
@@ -1088,12 +1430,219 @@
   testLevelDown.addEventListener('click', () => { testLevel = Math.max(1, testLevel-1); updateTestLevelLabel(); });
   testExitBtn.addEventListener('click', exitTestMode);
 
+  // ---------- BALANCING MODE ----------
+  function updateBalConfigLabels() {
+    balRepsLabel.textContent = 'REPS: ' + balancingReps;
+    balConfigLevelLabel.textContent = 'TEST LEVEL ' + balancingLevel;
+  }
+
+  balModeBtn.addEventListener('click', () => {
+    balancingLevel = testLevel;
+    updateBalConfigLabels();
+    testMenu.style.display = 'none';
+    balancingConfig.style.display = 'flex';
+  });
+  balConfigBackBtn.addEventListener('click', () => {
+    balancingConfig.style.display = 'none';
+    testMenu.style.display = 'flex';
+  });
+  balRepsUp.addEventListener('click', () => { balancingReps = Math.min(50, balancingReps+1); updateBalConfigLabels(); });
+  balRepsDown.addEventListener('click', () => { balancingReps = Math.max(1, balancingReps-1); updateBalConfigLabels(); });
+  balConfigLevelUp.addEventListener('click', () => { balancingLevel = Math.min(20, balancingLevel+1); updateBalConfigLabels(); });
+  balConfigLevelDown.addEventListener('click', () => { balancingLevel = Math.max(1, balancingLevel-1); updateBalConfigLabels(); });
+
+  balStartBtn.addEventListener('click', () => {
+    balancingConfig.style.display = 'none';
+    startBalancingMode();
+  });
+
+  balExitBtn.addEventListener('click', exitBalancingMode);
+  balResultsBackBtn.addEventListener('click', () => {
+    balancingResultsScreen.style.display = 'none';
+    testMenu.style.display = 'flex';
+  });
+
+  function startBalancingMode() {
+    balancingActive = true;
+    balancingGameIdx = 0;
+    balancingAttemptIdx = 0;
+    balancingResults = microgamePool.map(e => ({ name: e.name, cmd: e.cmd, attempts: [] }));
+    balancingHud.style.display = 'flex';
+    balancingEscHandler = (e) => { if (e.key === 'Escape') exitBalancingMode(); };
+    window.addEventListener('keydown', balancingEscHandler);
+    runBalancingRound();
+  }
+
+  function exitBalancingMode() {
+    balancingActive = false;
+    if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
+    clearTimeout(timeoutHandle);
+    stage.innerHTML = '';
+    balancingHud.style.display = 'none';
+    timerWrap.style.display = 'none';
+    commandOverlay.style.display = 'none';
+    resultBanner.classList.remove('show');
+    if (balancingEscHandler) { window.removeEventListener('keydown', balancingEscHandler); balancingEscHandler = null; }
+    testMenu.style.display = 'flex';
+  }
+
+  function runBalancingRound() {
+    if (!balancingActive) return;
+    if (balancingGameIdx >= microgamePool.length) { finishBalancingMode(); return; }
+    if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
+    stage.innerHTML = '';
+    const entry = microgamePool[balancingGameIdx];
+    const duration = computeDuration(entry, balancingLevel, stage);
+
+    balHudLabel.textContent = entry.cmd + ' / ' + entry.name + '  —  attempt ' + (balancingAttemptIdx+1) + '/' + balancingReps;
+
+    commandOverlay.style.display = 'flex';
+    commandText.textContent = entry.cmd;
+    commandText.className = '';
+    void commandText.offsetWidth;
+    commandText.className = 'slam';
+
+    setTimeout(() => {
+      if (!balancingActive) return;
+      commandOverlay.style.display = 'none';
+      const game = entry.factory();
+      let resolved = false;
+      const startTime = performance.now();
+      timerWrap.style.display = entry.hideTimer ? 'none' : 'block';
+      timerBar.style.background = '#2ea043';
+
+      function finish(success) {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutHandle);
+        const elapsed = (performance.now() - startTime) / 1000;
+        let danger;
+        if (typeof game.getDanger === 'function') {
+          danger = game.getDanger();
+        } else {
+          danger = clamp01(elapsed / duration);
+        }
+        if (!success) danger = 1;
+        const pct = Math.round(danger * 100);
+        try { game.cleanup(); } catch(e){}
+        currentCleanup = null;
+
+        resultText.textContent = success ? 'SUCCESS!' : 'FAIL!';
+        resultText.className = success ? 'success-banner' : 'fail-banner';
+        resultBanner.classList.add('show');
+        doFlash();
+        if (!success) vibScreen();
+
+        balancingResults[balancingGameIdx].attempts.push({ pct, success });
+
+        setTimeout(() => {
+          resultBanner.classList.remove('show');
+          if (!balancingActive) return;
+          balancingAttemptIdx++;
+          if (balancingAttemptIdx >= balancingReps) {
+            balancingAttemptIdx = 0;
+            balancingGameIdx++;
+          }
+          runBalancingRound();
+        }, 550);
+      }
+
+      function tick() {
+        if (resolved || !balancingActive) return;
+        const elapsed = (performance.now() - startTime) / 1000;
+        const pctLeft = Math.max(0, 1 - elapsed/duration);
+        timerBar.style.width = (pctLeft*100) + '%';
+        if (pctLeft < 0.3) timerBar.style.background = '#d8324a';
+        if (pctLeft > 0) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      game.init(stage, duration, finish, balancingLevel);
+      currentCleanup = () => game.cleanup();
+
+      timeoutHandle = setTimeout(() => {
+        if (resolved) return;
+        finish(!!game.onTimeoutSuccess);
+      }, duration*1000);
+    }, 420);
+  }
+
+  function finishBalancingMode() {
+    balancingActive = false;
+    if (balancingEscHandler) { window.removeEventListener('keydown', balancingEscHandler); balancingEscHandler = null; }
+    balancingHud.style.display = 'none';
+    timerWrap.style.display = 'none';
+    stage.innerHTML = '';
+    renderBalancingResults();
+    balancingResultsScreen.style.display = 'flex';
+  }
+
+  function buildBalancingResultsText() {
+    const lines = ['BALANCING RESULTS (level ' + balancingLevel + ', ' + balancingReps + ' reps each)'];
+    balancingResults.forEach(res => {
+      const parts = res.attempts.map(a => a.pct + '%' + (a.success ? '' : '(FAIL)'));
+      lines.push(res.cmd + ' (' + res.name + '): ' + parts.join(', '));
+    });
+    return lines.join('\n');
+  }
+
+  function renderBalancingResults() {
+    balResultsList.innerHTML = '';
+    balancingResults.forEach(res => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#1c1c1c; border:3px solid #444; border-radius:10px; padding:10px 14px; text-align:left;';
+      const title = document.createElement('div');
+      title.style.cssText = 'font-weight:900; color:#ffd23f; font-size:15px; margin-bottom:6px;';
+      title.textContent = res.cmd + '  (' + res.name + ')';
+      card.appendChild(title);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px;';
+      res.attempts.forEach(a => {
+        const chip = document.createElement('span');
+        chip.style.cssText = 'display:inline-block; padding:4px 8px; border-radius:6px; font-weight:900; font-size:13px; color:#fff; background:' + (a.success ? '#2ea043' : '#d8324a') + ';';
+        chip.textContent = a.pct + '%';
+        row.appendChild(chip);
+      });
+      card.appendChild(row);
+      balResultsList.appendChild(card);
+    });
+    balResultsText.value = buildBalancingResultsText();
+  }
+
+  balCopyBtn.addEventListener('click', () => {
+    const text = balResultsText.value;
+    const done = () => {
+      const original = balCopyBtn.textContent;
+      balCopyBtn.textContent = 'COPIED!';
+      setTimeout(() => { balCopyBtn.textContent = original; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {
+        balResultsText.select();
+        document.execCommand('copy');
+        done();
+      });
+    } else {
+      balResultsText.select();
+      document.execCommand('copy');
+      done();
+    }
+  });
+
   function updateLivesUI() {
     livesEl.innerHTML = 'LIVES: ' + '<span>&#9829;</span>'.repeat(lives);
   }
 
-  function startGame() {
-    lives = 3; level = 1; streak = 0;
+  function startGame(chosenStartLevel) {
+    startLevel = chosenStartLevel || 1;
+    lives = 3; level = startLevel; streak = 0;
+    isRoomMatch = !!seededPlan;
+    matchHistory = [];
+    // Anchor the fixed-duration schedule to the same absolute moment every
+    // synced machine starts its match at (roomStartTime), so round slots
+    // line up even though nothing is actually communicating live.
+    roundScheduledStart = isRoomMatch ? roomStartTime : null;
+    roundScheduledEnd = null;
     centerMenu.style.display = 'none';
     hud.style.display = 'flex';
     timerWrap.style.display = 'block';
@@ -1107,21 +1656,184 @@
     timerWrap.style.display = 'none';
     stage.innerHTML = '';
     bestStreak = Math.max(bestStreak, streak);
-    statLine.textContent = 'Streak: ' + streak + '  |  Best: ' + bestStreak;
-    centerMenu.style.display = 'flex';
-    startBtn.textContent = 'PLAY AGAIN';
+    if (isRoomMatch) {
+      showMatchSummary();
+    } else {
+      statLine.textContent = 'Streak: ' + streak + '  |  Best: ' + bestStreak;
+      centerMenu.style.display = 'flex';
+      startBtn.textContent = 'PLAY AGAIN';
+    }
   }
+
+  // ---------- END-OF-MATCH SUMMARY / COMPARE (room matches only) ----------
+  function encodeMatchCode() {
+    const payload = {
+      s: currentRoomSeed,
+      lvl: roomStartLevelChosen,
+      h: matchHistory.map(r => r.success ? 1 : 0),
+      streak: streak,
+      best: bestStreak
+    };
+    try {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function decodeMatchCode(code) {
+    try {
+      const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+      if (!payload || !Array.isArray(payload.h)) return null;
+      return payload;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function renderRoundChips(container, historyBits) {
+    container.innerHTML = '';
+    historyBits.forEach((won, i) => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-block; width:18px; height:18px; border-radius:4px; background:' +
+        (won ? '#2ea043' : '#d8324a') + '; border:2px solid #000;';
+      chip.title = 'Round ' + (i+1) + ': ' + (won ? 'success' : 'fail');
+      container.appendChild(chip);
+    });
+  }
+
+  function showMatchSummary() {
+    const roundsSurvived = matchHistory.length;
+    const wins = matchHistory.filter(r => r.success).length;
+    msYourStats.textContent = 'Rounds played: ' + roundsSurvived + '  |  Wins: ' + wins +
+      '  |  Final streak: ' + streak + '  |  Best streak: ' + bestStreak;
+    renderRoundChips(msYourRounds, matchHistory.map(r => r.success));
+    msYourCode.value = encodeMatchCode();
+    msPasteCode.value = '';
+    msCompareResult.style.display = 'none';
+    msCompareResult.innerHTML = '';
+    matchSummaryScreen.style.display = 'flex';
+  }
+
+  msCopyBtn.addEventListener('click', () => {
+    const text = msYourCode.value;
+    const done = () => {
+      const original = msCopyBtn.textContent;
+      msCopyBtn.textContent = 'COPIED!';
+      setTimeout(() => { msCopyBtn.textContent = original; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {
+        msYourCode.select();
+        document.execCommand('copy');
+        done();
+      });
+    } else {
+      msYourCode.select();
+      document.execCommand('copy');
+      done();
+    }
+  });
+
+  msCompareBtn.addEventListener('click', () => {
+    const theirs = decodeMatchCode(msPasteCode.value);
+    msCompareResult.innerHTML = '';
+    if (!theirs) {
+      const err = document.createElement('div');
+      err.style.cssText = 'color:#d8324a; font-weight:900; font-size:13px;';
+      err.textContent = "Couldn't read that code -- make sure it was copied in full.";
+      msCompareResult.appendChild(err);
+      msCompareResult.style.display = 'flex';
+      return;
+    }
+    const yourBits = matchHistory.map(r => r.success);
+    const theirBits = theirs.h.map(b => !!b);
+    const yourWins = yourBits.filter(Boolean).length;
+    const theirWins = theirBits.filter(Boolean).length;
+
+    const seedNote = document.createElement('div');
+    seedNote.style.cssText = 'font-size:12px; color:' + (theirs.s === currentRoomSeed ? '#2ea043' : '#d8324a') + ';';
+    seedNote.textContent = theirs.s === currentRoomSeed
+      ? 'Same room -- directly comparable.'
+      : "Heads up: that code is from a different room, so the round order won't match.";
+    msCompareResult.appendChild(seedNote);
+
+    const label1 = document.createElement('div');
+    label1.style.cssText = 'font-size:12px; color:#ddd; text-align:left; width:100%;';
+    label1.textContent = 'You: ' + yourBits.length + ' rounds, ' + yourWins + ' wins, streak ' + streak;
+    msCompareResult.appendChild(label1);
+    const row1 = document.createElement('div');
+    row1.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:center;';
+    msCompareResult.appendChild(row1);
+    renderRoundChips(row1, yourBits);
+
+    const label2 = document.createElement('div');
+    label2.style.cssText = 'font-size:12px; color:#ddd; text-align:left; width:100%; margin-top:6px;';
+    label2.textContent = 'Them: ' + theirBits.length + ' rounds, ' + theirWins + ' wins, streak ' + theirs.streak;
+    msCompareResult.appendChild(label2);
+    const row2 = document.createElement('div');
+    row2.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:center;';
+    msCompareResult.appendChild(row2);
+    renderRoundChips(row2, theirBits);
+
+    const verdict = document.createElement('div');
+    verdict.style.cssText = 'font-size:18px; font-weight:900; color:#ffd23f; margin-top:8px;';
+    let who;
+    if (yourBits.length !== theirBits.length) {
+      who = yourBits.length > theirBits.length ? 'YOU LASTED LONGER!' : 'THEY LASTED LONGER!';
+    } else if (yourWins !== theirWins) {
+      who = yourWins > theirWins ? 'YOU WIN!' : 'THEY WIN!';
+    } else {
+      who = "IT'S A TIE!";
+    }
+    verdict.textContent = who;
+    msCompareResult.appendChild(verdict);
+
+    msCompareResult.style.display = 'flex';
+  });
+
+  msBackBtn.addEventListener('click', () => {
+    matchSummaryScreen.style.display = 'none';
+    centerMenu.style.display = 'flex';
+    statLine.textContent = 'Streak: ' + streak + '  |  Best: ' + bestStreak;
+    startBtn.textContent = 'PLAY AGAIN';
+  });
+
+  let activeEntry = null;
+  let activeLevel = null;
 
   function nextRound() {
     if (currentCleanup) { try { currentCleanup(); } catch(e){} currentCleanup = null; }
     stage.innerHTML = '';
-    level = Math.floor(streak / 3) + 1;
-    levelLabel.textContent = 'LEVEL ' + level;
 
-    const pool = microgamePool.filter(g => g.name !== lastGameName);
-    const entry = pick(pool.length ? pool : microgamePool);
-    lastGameName = entry.name;
+    let entry;
+    if (seededPlan) {
+      // Deterministic path: pull the next round straight from the
+      // pre-generated plan instead of picking live, so round order/content
+      // matches exactly what any other machine seeded the same way got.
+      const planEntry = seededPlan[seededRoundIdx % seededPlan.length];
+      seededRoundIdx++;
+      level = planEntry.level;
+      entry = planEntry.entry;
+    } else {
+      level = Math.min(20, startLevel + Math.floor(streak / 3));
+      const pool = microgamePool.filter(g => g.name !== lastGameName);
+      entry = pick(pool.length ? pool : microgamePool);
+      lastGameName = entry.name;
+    }
+    activeEntry = entry;
+    activeLevel = level;
+    levelLabel.textContent = 'LEVEL ' + level;
     const duration = computeDuration(entry, level, stage);
+
+    // For room matches, this round's whole slot (slam + play + result pause)
+    // is pinned to the same absolute wall-clock window on every machine,
+    // anchored at roundScheduledStart (which starts at roomStartTime and
+    // advances by one full slot each round in handleRoundEnd).
+    if (isRoomMatch) {
+      const slotMs = COMMAND_SLAM_MS + duration*1000 + RESULT_PAUSE_MS;
+      roundScheduledEnd = roundScheduledStart + slotMs;
+    }
 
     // command slam
     commandOverlay.style.display = 'flex';
@@ -1134,7 +1846,7 @@
     setTimeout(() => {
       commandOverlay.style.display = 'none';
       runMicrogame(entry, duration);
-    }, 420);
+    }, COMMAND_SLAM_MS);
   }
 
   function runMicrogame(entry, duration) {
@@ -1185,14 +1897,27 @@
     try { game.cleanup(); } catch(e){}
     currentCleanup = null;
 
+    if (activeEntry) {
+      matchHistory.push({ round: matchHistory.length, name: activeEntry.name, cmd: activeEntry.cmd, level: activeLevel, success });
+    }
+
     resultText.textContent = success ? 'SUCCESS!' : 'FAIL!';
     resultText.className = success ? 'success-banner' : 'fail-banner';
     resultBanner.classList.add('show');
     doFlash();
     if (!success) vibScreen();
 
+    // Early wins/losses don't get to skip ahead: for room matches, wait out
+    // whatever's left of this round's scheduled slot (at least the normal
+    // result pause) before advancing, so both machines stay locked to the
+    // same round at the same time no matter how quickly either one resolved.
+    const wait = isRoomMatch
+      ? Math.max(RESULT_PAUSE_MS, roundScheduledEnd - Date.now())
+      : RESULT_PAUSE_MS;
+
     setTimeout(() => {
       resultBanner.classList.remove('show');
+      if (isRoomMatch) roundScheduledStart = roundScheduledEnd;
       if (success) {
         streak++;
         if (streak % 10 === 0) showToast('SPEED UP! x' + streak);
@@ -1206,10 +1931,20 @@
           nextRound();
         }
       }
-    }, 550);
+    }, wait);
   }
 
-  startBtn.addEventListener('click', startGame);
+  startBtn.addEventListener('click', () => {
+    centerMenu.style.display = 'none';
+    difficultyMenu.style.display = 'flex';
+  });
+  diffEasyBtn.addEventListener('click', () => { difficultyMenu.style.display = 'none'; startGame(1); });
+  diffMediumBtn.addEventListener('click', () => { difficultyMenu.style.display = 'none'; startGame(10); });
+  diffHardBtn.addEventListener('click', () => { difficultyMenu.style.display = 'none'; startGame(20); });
+  diffCancelBtn.addEventListener('click', () => {
+    difficultyMenu.style.display = 'none';
+    centerMenu.style.display = 'flex';
+  });
 })();
 </script>
 </body>
