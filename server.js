@@ -238,6 +238,18 @@ wss.on('connection', (ws) => {
         if (typeof roundIndex !== 'number') return;
 
         recordRoundReport(room, ws.roomCode, ws.clientId, roundIndex, !!msg.finished);
+
+        // Let everyone else's opponents panel show this player's current
+        // lives/round. Purely cosmetic, so no validation beyond basic
+        // typeof checks -- worst case a bad value just displays oddly for
+        // one player, it never touches actual round-advance logic above.
+        broadcastRoomExcept(ws.roomCode, ws.clientId, {
+          type: 'peer_progress',
+          clientId: ws.clientId,
+          lives: typeof msg.lives === 'number' ? msg.lives : null,
+          round: typeof msg.round === 'number' ? msg.round : null,
+          finished: !!msg.finished,
+        });
         break;
       }
 
