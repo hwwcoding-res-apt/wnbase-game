@@ -501,16 +501,17 @@
     }
     highlight();
     const kh = (e) => {
-      const isNav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key);
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const isNav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(key);
       const isConfirm = e.code === 'Space';
       if (!isNav && !isConfirm) return;
       e.preventDefault();
       if (isConfirm) { confirmCb(idx); return; }
       const row = Math.floor(idx/cols), col = idx%cols;
-      if (e.key === 'ArrowLeft') idx = row*cols + Math.max(0, col-1);
-      else if (e.key === 'ArrowRight') idx = row*cols + Math.min(cols-1, col+1);
-      else if (e.key === 'ArrowUp') idx = Math.max(0, row-1)*cols + col;
-      else if (e.key === 'ArrowDown') idx = Math.min(rowsTotal-1, row+1)*cols + col;
+      if (key === 'ArrowLeft' || key === 'a') idx = row*cols + Math.max(0, col-1);
+      else if (key === 'ArrowRight' || key === 'd') idx = row*cols + Math.min(cols-1, col+1);
+      else if (key === 'ArrowUp' || key === 'w') idx = Math.max(0, row-1)*cols + col;
+      else if (key === 'ArrowDown' || key === 's') idx = Math.min(rowsTotal-1, row+1)*cols + col;
       idx = Math.max(0, Math.min(cells.length-1, idx));
       highlight();
     };
@@ -526,7 +527,7 @@
     const colors = ['#d8324a', '#2a63d8', '#ffd23f', '#2ea043'];
     function init(c, duration, cb) {
       container = c; onResult = cb; done = false;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CLICK THE GLOWING ONE!</div><div class="grid4" id="g4"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">CLICK THE GLOWING ONE!</div><div class="grid4" id="g4"></div><div id="gridHint">ARROWS/WASD TO MOVE, SPACE TO PICK</div></div>';
       const g4 = c.querySelector('#g4');
       const targetIdx = Math.floor(rngFn()*4);
       const cells = colors.map((col, i) => {
@@ -772,7 +773,7 @@
         ? `hsl(${baseHue},${baseSat}%,${baseLight + (rngFn()<0.5?-1:1)*lightDelta}%)`
         : `hsl(${(baseHue+hueDelta)%360},${baseSat}%,${baseLight}%)`;
       const diffIdx = Math.floor(rngFn()*cells);
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">FIND THE ODD ONE OUT!</div><div class="diffGrid"><div class="diffBoard" id="board"></div></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">FIND THE ODD ONE OUT!</div><div class="diffGrid"><div class="diffBoard" id="board"></div></div><div id="gridHint">ARROWS/WASD TO MOVE, SPACE TO PICK</div></div>';
       const board = c.querySelector('#board');
       const cellEls = [];
       for (let i=0;i<cells;i++) {
@@ -893,7 +894,7 @@
       const len = Math.min(5, 3 + Math.floor(level/3));
       sequence = Array.from({length: len}, () => Math.floor(rand(0,4)));
       playerIdx = 0;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS TO MOVE, SPACE TO PICK</div></div>';
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS/WASD TO MOVE, SPACE TO PICK</div></div>';
       const sg = c.querySelector('#sg');
       tiles = colors.map((col,i) => {
         const t = document.createElement('div');
@@ -971,8 +972,8 @@
       angle = 0;
       dotPos = 0; vel = 0;
       keyH = (e) => {
-        if (['ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
-        keys[e.key] = (e.type === 'keydown');
+        if (['ArrowLeft','ArrowRight','a','d','A','D'].includes(e.key)) e.preventDefault();
+        keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = (e.type === 'keydown');
       };
       window.addEventListener('keydown', keyH);
       window.addEventListener('keyup', keyH);
@@ -982,8 +983,8 @@
         if (done) return;
         const dt = Math.min(0.05, (t-last)/1000); last = t;
         angle += (windTarget - angle) * windPull * dt;
-        if (keys['ArrowLeft']) angle -= tiltSpeed*dt;
-        if (keys['ArrowRight']) angle += tiltSpeed*dt;
+        if (keys['ArrowLeft']||keys['a']) angle -= tiltSpeed*dt;
+        if (keys['ArrowRight']||keys['d']) angle += tiltSpeed*dt;
         angle = Math.max(-28, Math.min(28, angle));
         vel += (angle/28) * gravity * dt;
         vel *= 0.995;
