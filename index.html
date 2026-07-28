@@ -1298,7 +1298,7 @@
   // both sides render the same live player list from room_update broadcasts.
   // No gameplay sync yet -- generateRoundPlan/enterLobby aren't wired to
   // this yet, that's a later phase.
-  const ROOM_SERVER_URL = 'wss://wnbase-game.onrender.com'; // TODO: set after Render deploy
+  const ROOM_SERVER_URL = 'wss://YOUR-RENDER-APP.onrender.com'; // TODO: set after Render deploy
 
   let roomSocket = null;
   let myClientId = null;
@@ -1418,16 +1418,21 @@
   function connectRoomSocket(onOpen) {
     if (roomSocket && roomSocket.readyState === WebSocket.OPEN) { onOpen(); return; }
     if (roomSocket) { try { roomSocket.close(); } catch (e) {} }
-    roomSocket = new WebSocket(ROOM_SERVER_URL);
-    roomSocket.addEventListener('open', onOpen);
-    roomSocket.addEventListener('message', (evt) => {
+    const sock = new WebSocket(ROOM_SERVER_URL);
+    roomSocket = sock;
+    sock.addEventListener('open', () => {
+      if (roomSocket !== sock) return; // superseded by a newer attempt, ignore
+      onOpen();
+    });
+    sock.addEventListener('message', (evt) => {
+      if (roomSocket !== sock) return; // stale socket, ignore
       let msg;
       try { msg = JSON.parse(evt.data); } catch (e) { return; }
       handleRoomMessage(msg);
     });
-    roomSocket.addEventListener('close', () => { roomSocket = null; });
-    roomSocket.addEventListener('error', () => {
-      joinCodeError.textContent = 'Could not reach the room server.';
+    sock.addEventListener('close', () => { if (roomSocket === sock) roomSocket = null; });
+    sock.addEventListener('error', () => {
+      if (roomSocket === sock) joinCodeError.textContent = 'Could not reach the room server.';
     });
   }
 
