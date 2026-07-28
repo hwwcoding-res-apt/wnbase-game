@@ -22,6 +22,18 @@
     text-shadow: 0 1px 0 #fff;
   }
   #lives span { color: #d8324a; font-size: 22px; margin-left: 2px; }
+  #opponentsPanel {
+    position: absolute; top: 54px; right: 14px; z-index: 50;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+    align-items: flex-end;
+  }
+  .opponentRow {
+    background: rgba(0,0,0,0.55); border-radius: 8px; padding: 5px 10px;
+    color: #fff; font-size: 12px; font-weight: 900; text-align: right;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8); white-space: nowrap;
+  }
+  .opponentRow .oppHearts span { color: #d8324a; font-size: 14px; margin-left: 1px; }
+  .opponentRow.opponentOut { opacity: 0.5; }
   #timerWrap {
     position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
     width: 200px; height: 10px; background: #ccc; border: 2px solid #222; border-radius: 6px;
@@ -266,8 +278,10 @@
 
   <div id="hud" style="display:none;">
     <div id="lives"></div>
+    <div id="roundLabel">ROUND 1</div>
     <div id="levelLabel">LEVEL 1</div>
   </div>
+  <div id="opponentsPanel" style="display:none;"></div>
   <div id="timerWrap" style="display:none;"><div id="timerBar"></div></div>
 
   <div id="commandOverlay" style="display:none;"><div id="commandText"></div></div>
@@ -409,6 +423,8 @@
   const hud = document.getElementById('hud');
   const livesEl = document.getElementById('lives');
   const levelLabel = document.getElementById('levelLabel');
+  const roundLabel = document.getElementById('roundLabel');
+  const opponentsPanel = document.getElementById('opponentsPanel');
   const timerWrap = document.getElementById('timerWrap');
   const timerBar = document.getElementById('timerBar');
   const commandOverlay = document.getElementById('commandOverlay');
@@ -856,9 +872,19 @@
         if (done) return; done = true;
         onResult(i === diffIdx);
       }
-      detachNav = attachArrowGridNav(cellEls, 7, select, (idx, cols, rowsTotal) => {
-        const row = Math.floor(idx/cols), col = idx%cols;
-        curFrac = { x: (col+0.5)/cols, y: (row+0.5)/rowsTotal };
+      detachNav = attachArrowGridNav(cellEls, 7, select, (idx) => {
+        // Report position as a fraction of the whole stage, not the grid
+        // cell/col math -- the board is centered with padding inside the
+        // stage, not full-bleed, so a naive col/row fraction of the grid
+        // doesn't line up with where the ghost layer (sized to the full
+        // stage) actually renders it. Real bounding rects sidestep that
+        // regardless of how the board is positioned or padded.
+        const cellRect = cellEls[idx].getBoundingClientRect();
+        const stageRect = container.getBoundingClientRect();
+        curFrac = {
+          x: (cellRect.left + cellRect.width/2 - stageRect.left) / stageRect.width,
+          y: (cellRect.top + cellRect.height/2 - stageRect.top) / stageRect.height,
+        };
       });
     }
     function cleanup() { done = true; if (detachNav) detachNav(); }
@@ -1333,6 +1359,27 @@
   let peerRenderRaf = null;
   const peerStates = new Map(); // clientId -> { x, y, targetX, targetY, lastUpdate, el }
 
+  // Phase 4 follow-up: opponent lives + round number, shown in a small
+  // side panel during room matches. Tracked separately from peerStates
+  // (position) since it only updates once per round, not continuously.
+  const peerMatchInfo = new Map(); // clientId -> { name, lives, round, finished }
+
+  function renderOpponentsPanel() {
+    if (!isRoomMatch || peerMatchInfo.size === 0) {
+      opponentsPanel.style.display = 'none';
+      return;
+    }
+    opponentsPanel.style.display = 'flex';
+    opponentsPanel.innerHTML = '';
+    for (const [clientId, info] of peerMatchInfo) {
+      const row = document.createElement('div');
+      row.className = 'opponentRow' + (info.finished ? ' opponentOut' : '');
+      const hearts = info.finished ? 'OUT' : '<span class="oppHearts">' + '&#9829;'.repeat(Math.max(0, info.lives)) + '</span>';
+      row.innerHTML = (info.name || 'Player') + ' &middot; RD ' + info.round + ' &middot; ' + hearts;
+      opponentsPanel.appendChild(row);
+    }
+  }
+
   function peerColor(clientId) {
     let hash = 0;
     for (let i = 0; i < clientId.length; i++) hash = (hash*31 + clientId.charCodeAt(i)) | 0;
@@ -1522,6 +1569,17 @@
         nextRound();
         break;
       }
+      case 'peer_progress': {
+        const existing = peerMatchInfo.get(msg.clientId);
+        peerMatchInfo.set(msg.clientId, {
+          name: (existing && existing.name) || roomPlayerNames.get(msg.clientId) || 'Player',
+          lives: msg.lives != null ? msg.lives : (existing ? existing.lives : 3),
+          round: msg.round != null ? msg.round : (existing ? existing.round : 0),
+          finished: !!msg.finished,
+        });
+        renderOpponentsPanel();
+        break;
+      }
       case 'peer_pos':
         handlePeerPos(msg);
         break;
@@ -1624,6 +1682,12 @@
     currentRoomSeed = seedValue;
     roomStartTime = startAtMs; // used only to time the pre-match 3-2-1 countdown now
     roomStartLevelChosen = lvl;
+    peerMatchInfo.clear();
+    for (const [clientId, name] of roomPlayerNames) {
+      if (clientId === myClientId) continue;
+      peerMatchInfo.set(clientId, { name, lives: 3, round: 0, finished: false });
+    }
+    renderOpponentsPanel();
     runMatchCountdown(startAtMs, lvl);
   }
 
@@ -1631,6 +1695,10 @@
     if (countdownRaf) { cancelAnimationFrame(countdownRaf); countdownRaf = null; }
     stopPeerStreaming();
     matchCountdownOverlay.style.display = 'none';
+    resultBanner.classList.remove('show');
+    resultText.textContent = '';
+    peerMatchInfo.clear();
+    opponentsPanel.style.display = 'none';
     seededPlan = null;
     seededRoundIdx = 0;
     currentRoomSeed = null;
@@ -1991,6 +2059,9 @@
     awaitingAdvance = false;
     matchEnded = false;
     roundWaitStatus.style.display = 'none';
+    resultBanner.classList.remove('show');
+    resultText.textContent = '';
+    if (!isRoomMatch) { peerMatchInfo.clear(); opponentsPanel.style.display = 'none'; }
     centerMenu.style.display = 'none';
     hud.style.display = 'flex';
     timerWrap.style.display = 'block';
@@ -2175,6 +2246,10 @@
     activeEntry = entry;
     activeLevel = level;
     levelLabel.textContent = 'LEVEL ' + level;
+    // Room matches pull round order from the deterministic plan (seededRoundIdx,
+    // already incremented above, is the 1-based round number); solo play has
+    // no fixed plan, so just count completed rounds so far.
+    roundLabel.textContent = 'ROUND ' + (isRoomMatch ? seededRoundIdx : (matchHistory.length + 1));
     const duration = computeDuration(entry, level, stage);
 
     // Phase 3: rounds now advance on a live "everyone's reported in"
@@ -2286,6 +2361,8 @@
           roundIndex: thisRoundIndex,
           success,
           finished: outOfLives,
+          lives,
+          round: seededRoundIdx,
         }));
       }
 
