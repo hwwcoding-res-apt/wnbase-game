@@ -1374,8 +1374,10 @@
     for (const [clientId, info] of peerMatchInfo) {
       const row = document.createElement('div');
       row.className = 'opponentRow' + (info.finished ? ' opponentOut' : '');
-      const hearts = info.finished ? 'OUT' : '<span class="oppHearts">' + '&#9829;'.repeat(Math.max(0, info.lives)) + '</span>';
-      row.innerHTML = (info.name || 'Player') + ' &middot; RD ' + info.round + ' &middot; ' + hearts;
+      const status = info.finished
+        ? 'DIED RD ' + info.round
+        : '<span class="oppHearts">' + '&#9829;'.repeat(Math.max(0, info.lives)) + '</span>';
+      row.innerHTML = (info.name || 'Player') + ' &middot; ' + status;
       opponentsPanel.appendChild(row);
     }
   }
@@ -1436,7 +1438,7 @@
   }
 
   function handlePeerPos(msg) {
-    if (!isRoomMatch) return;
+    if (!isRoomMatch || matchEnded) return;
     if (msg.roundIndex !== activeRoundIndex) return; // stale, for a round we've left
     if (msg.x == null || msg.y == null) return;
     let p = peerStates.get(msg.clientId);
@@ -1570,6 +1572,7 @@
         break;
       }
       case 'peer_progress': {
+        if (!isRoomMatch || matchEnded) break; // we've left/finished this match; ignore stragglers
         const existing = peerMatchInfo.get(msg.clientId);
         peerMatchInfo.set(msg.clientId, {
           name: (existing && existing.name) || roomPlayerNames.get(msg.clientId) || 'Player',
@@ -1622,6 +1625,21 @@
     matchCountdownOverlay.style.display = 'none';
     myClientId = null;
     currentHostId = null;
+    roomPlayerNames = new Map();
+    // Defensive: this screen is pre-match so these should already be at
+    // their defaults, but reset them anyway in case a prior match's state
+    // didn't get fully cleared -- cheap insurance against the same class
+    // of leftover-state bug leaveRoom() had.
+    isRoomMatch = false;
+    seededPlan = null;
+    seededRoundIdx = 0;
+    currentRoomSeed = null;
+    activeRoundIndex = null;
+    awaitingAdvance = false;
+    matchEnded = false;
+    roundWaitStatus.style.display = 'none';
+    peerMatchInfo.clear();
+    opponentsPanel.style.display = 'none';
     roomCodeMenu.style.display = 'none';
     centerMenu.style.display = 'flex';
   }
@@ -1697,11 +1715,30 @@
     matchCountdownOverlay.style.display = 'none';
     resultBanner.classList.remove('show');
     resultText.textContent = '';
+    roundWaitStatus.style.display = 'none';
     peerMatchInfo.clear();
     opponentsPanel.style.display = 'none';
+    // Full teardown -- this used to only reset the seeded-plan fields, which
+    // left isRoomMatch, the live socket, and activeRoundIndex all stale.
+    // With those left dangling, a still-playing ex-roommate's peer_pos /
+    // peer_progress / advance_round messages kept arriving and could pop UI
+    // (ghosts, "waiting for other players") back up over the main menu, or
+    // even leak into a subsequent solo game since isRoomMatch stayed true.
+    if (roomSocket) {
+      try { roomSocket.send(JSON.stringify({ type: 'leave_room' })); } catch (e) {}
+      try { roomSocket.close(); } catch (e) {}
+      roomSocket = null;
+    }
+    myClientId = null;
+    currentHostId = null;
+    roomPlayerNames = new Map();
+    isRoomMatch = false;
     seededPlan = null;
     seededRoundIdx = 0;
     currentRoomSeed = null;
+    activeRoundIndex = null;
+    awaitingAdvance = false;
+    matchEnded = false;
     matchSummaryScreen.style.display = 'none';
     centerMenu.style.display = 'flex';
   }
@@ -2215,8 +2252,7 @@
   });
 
   msBackBtn.addEventListener('click', () => {
-    matchSummaryScreen.style.display = 'none';
-    centerMenu.style.display = 'flex';
+    leaveRoom();
     statLine.textContent = 'Streak: ' + streak + '  |  Best: ' + bestStreak;
     startBtn.textContent = 'PLAY AGAIN';
   });
