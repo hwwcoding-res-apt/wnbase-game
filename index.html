@@ -38,6 +38,16 @@
     text-shadow: 4px 4px 0 #d8324a;
     transform: scale(0.3) rotate(-6deg); opacity: 0;
   }
+  #matchCountdownOverlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; z-index: 260; background: #111;
+  }
+  #matchCountdownText {
+    font-size: 22vw; color: #ffd23f; font-weight: 900;
+    text-shadow: 4px 4px 0 #d8324a;
+    transform: scale(0.3) rotate(-6deg); opacity: 0;
+  }
+  #matchCountdownLabel { color: #aaa; font-size: 14px; letter-spacing: 2px; }
   @keyframes slamIn {
     0% { transform: scale(2.4) rotate(-6deg); opacity: 0; }
     55% { transform: scale(0.85) rotate(2deg); opacity: 1; }
@@ -129,6 +139,24 @@
   #dodgeArena { position: absolute; inset: 0; background: #dfe9f3; }
   #dodgePlayer { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #2a63d8; border: 3px solid #123a80; }
   .projectile { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #d8324a; border: 3px solid #6e0f1e; }
+
+  /* Phase 4: live minigame visibility -- ghost markers for other players'
+     positions, layered on top of whatever minigame is running. Pointer
+     events pass through so they never intercept clicks/keys meant for the
+     local player's own game. */
+  #peerLayer { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+  .peerGhost {
+    position: absolute; width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,0.35); border: 3px solid #fff;
+    transform: translate(-50%,-50%);
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.35);
+    transition: opacity 0.15s linear;
+  }
+  .peerGhost .peerLabel {
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: 900; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap;
+  }
 
   #typeWord { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%); font-size: 48px; font-weight: 900; letter-spacing: 4px; color: #222; }
   #typeInput {
@@ -226,6 +254,7 @@
   <div id="stage"></div>
   <div id="flash"></div>
   <div id="resultBanner"><span id="resultText"></span></div>
+  <div id="roundWaitStatus" style="display:none; position:absolute; bottom:8%; left:50%; transform:translateX(-50%); z-index:160; color:#ddd; font-size:14px; font-weight:900; text-shadow:2px 2px 0 #000; background:rgba(0,0,0,0.5); padding:6px 16px; border-radius:20px;"></div>
   <div id="streakToast"></div>
 
   <div id="hud" style="display:none;">
@@ -242,7 +271,29 @@
     <div id="statLine"></div>
     <button class="bigBtn" id="startBtn">START</button>
     <button class="bigBtn" id="friendBtn" style="background:#8a3fd8;color:#fff;box-shadow:0 4px 0 #3f1a70;">PLAY WITH FRIEND</button>
+    <button class="bigBtn" id="joinRoomBtn" style="background:#2ea043;color:#fff;box-shadow:0 4px 0 #123a1e;">JOIN WITH CODE</button>
     <button class="bigBtn" id="testModeBtn" style="background:#2a63d8;color:#fff;box-shadow:0 4px 0 #123a80;">TEST MODE</button>
+  </div>
+
+  <!-- Phase 1: enter a room code to join a friend's room -->
+  <div id="joinCodeMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:24px; color:#fff; text-shadow:3px 3px 0 #000;">ENTER ROOM CODE</h1>
+    <input id="joinCodeInput" maxlength="4" placeholder="ABCD" autocapitalize="characters" style="width:180px; font-size:32px; letter-spacing:8px; text-align:center; text-transform:uppercase; padding:10px; border-radius:8px; border:3px solid #444; font-family:monospace;">
+    <div id="joinCodeError" style="color:#ff6b6b; font-size:13px; min-height:16px;"></div>
+    <button class="bigBtn" id="joinCodeSubmitBtn" style="background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">JOIN</button>
+    <button class="bigBtn" id="joinCodeBackBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
+  </div>
+
+  <!-- Phase 1: shows the room code (host) and live player list once
+       connected. No gameplay sync yet -- that's a later phase. -->
+  <div id="roomCodeMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
+    <h1 style="font-size:20px; color:#fff; text-shadow:3px 3px 0 #000;">ROOM CODE</h1>
+    <div id="roomCodeDisplay" style="font-size:52px; letter-spacing:10px; color:#ffd23f; text-shadow:3px 3px 0 #000; font-family:monospace;">----</div>
+    <p style="color:#ddd; font-size:13px; max-width:300px;">Share this code with your friend. They tap "JOIN WITH CODE" and enter it.</p>
+    <div id="roomPlayerList" style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:6px;"></div>
+    <button class="bigBtn" id="roomStartMatchBtn" style="display:none; background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">START MATCH</button>
+    <p id="roomWaitingNote" style="display:none; color:#ccc; font-size:13px;">Waiting for the host to start...</p>
+    <button class="bigBtn" id="roomCodeLeaveBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">LEAVE ROOM</button>
   </div>
 
   <div id="difficultyMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
@@ -262,22 +313,9 @@
     <button class="bigBtn" id="roomDiffCancelBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
   </div>
 
-  <div id="roomLinkMenu" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.55); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; text-align:center;">
-    <h1 style="font-size:22px; color:#fff; text-shadow:3px 3px 0 #000;">SEND THIS LINK</h1>
-    <p style="color:#ddd; font-size:13px; max-width:300px;">Share it with your friend. The match starts for both of you the moment the countdown hits zero.</p>
-    <textarea id="roomLinkText" readonly style="width:88%; max-width:420px; height:60px; font-size:12px; padding:10px; border-radius:8px; border:2px solid #333; resize:none;"></textarea>
-    <button class="bigBtn" id="roomCopyBtn" style="background:#2a63d8;color:#fff;box-shadow:0 4px 0 #123a80; font-size:14px;">COPY LINK</button>
-    <button class="bigBtn" id="roomEnterLobbyBtn" style="background:#2ea043; color:#fff; box-shadow:0 4px 0 #123a1e;">CONTINUE</button>
-    <button class="bigBtn" id="roomLinkBackBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">BACK</button>
-  </div>
-
-  <div id="lobbyScreen" style="display:none; position:absolute; inset:0; z-index:250; background:rgba(0,0,0,0.7); flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; text-align:center;">
-    <h1 style="font-size:24px; color:#ffd23f; text-shadow:3px 3px 0 #000;">WAITING TO SYNC...</h1>
-    <div id="lobbyCountdown" style="font-size:60px; color:#fff; text-shadow:3px 3px 0 #000;">--</div>
-    <p id="lobbyNote" style="color:#ccc; font-size:13px; max-width:300px;">Make sure your friend has opened the same link.</p>
-    <button class="bigBtn" id="lobbyMinus15Btn" style="background:#ffd23f; color:#3a2a00; box-shadow:0 4px 0 #7a5b00; font-size:14px;">-15s</button>
-    <p style="color:#888; font-size:11px; max-width:280px;">Both of you have to press this the same number of times or you'll start at different moments -- agree out loud first ("let's both hit it 6 times").</p>
-    <button class="bigBtn" id="lobbyLeaveBtn" style="background:#555; color:#fff; box-shadow:0 4px 0 #222; font-size:13px; padding:8px 20px;">LEAVE ROOM</button>
+  <div id="matchCountdownOverlay">
+    <div id="matchCountdownText">3</div>
+    <div id="matchCountdownLabel">GET READY</div>
   </div>
 
   <div id="matchSummaryScreen" style="display:none; position:absolute; inset:0; z-index:300; background:#111; color:#fff; flex-direction:column; align-items:center; justify-content:flex-start; gap:12px; padding:20px; overflow-y:auto; text-align:center;">
@@ -364,6 +402,7 @@
   const flash = document.getElementById('flash');
   const resultBanner = document.getElementById('resultBanner');
   const resultText = document.getElementById('resultText');
+  const roundWaitStatus = document.getElementById('roundWaitStatus');
   const centerMenu = document.getElementById('centerMenu');
   const startBtn = document.getElementById('startBtn');
   const difficultyMenu = document.getElementById('difficultyMenu');
@@ -377,16 +416,20 @@
   const roomMediumBtn = document.getElementById('roomMediumBtn');
   const roomHardBtn = document.getElementById('roomHardBtn');
   const roomDiffCancelBtn = document.getElementById('roomDiffCancelBtn');
-  const roomLinkMenu = document.getElementById('roomLinkMenu');
-  const roomLinkText = document.getElementById('roomLinkText');
-  const roomCopyBtn = document.getElementById('roomCopyBtn');
-  const roomEnterLobbyBtn = document.getElementById('roomEnterLobbyBtn');
-  const roomLinkBackBtn = document.getElementById('roomLinkBackBtn');
-  const lobbyScreen = document.getElementById('lobbyScreen');
-  const lobbyCountdown = document.getElementById('lobbyCountdown');
-  const lobbyNote = document.getElementById('lobbyNote');
-  const lobbyLeaveBtn = document.getElementById('lobbyLeaveBtn');
-  const lobbyMinus15Btn = document.getElementById('lobbyMinus15Btn');
+  const joinRoomBtn = document.getElementById('joinRoomBtn');
+  const joinCodeMenu = document.getElementById('joinCodeMenu');
+  const joinCodeInput = document.getElementById('joinCodeInput');
+  const joinCodeError = document.getElementById('joinCodeError');
+  const joinCodeSubmitBtn = document.getElementById('joinCodeSubmitBtn');
+  const joinCodeBackBtn = document.getElementById('joinCodeBackBtn');
+  const roomCodeMenu = document.getElementById('roomCodeMenu');
+  const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+  const roomPlayerList = document.getElementById('roomPlayerList');
+  const roomCodeLeaveBtn = document.getElementById('roomCodeLeaveBtn');
+  const roomStartMatchBtn = document.getElementById('roomStartMatchBtn');
+  const roomWaitingNote = document.getElementById('roomWaitingNote');
+  const matchCountdownOverlay = document.getElementById('matchCountdownOverlay');
+  const matchCountdownText = document.getElementById('matchCountdownText');
   const matchSummaryScreen = document.getElementById('matchSummaryScreen');
   const msYourStats = document.getElementById('msYourStats');
   const msYourRounds = document.getElementById('msYourRounds');
@@ -493,11 +536,12 @@
   // ---------- SHARED: arrow-key grid navigation ----------
   // cells: array of DOM elements in row-major order. cols: grid width.
   // confirmCb(index) is called when Space is pressed on the current cell.
-  function attachArrowGridNav(cells, cols, confirmCb) {
+  function attachArrowGridNav(cells, cols, confirmCb, onMove) {
     let idx = 0;
     const rowsTotal = Math.ceil(cells.length / cols);
     function highlight() {
       cells.forEach((c,i) => c.classList.toggle('cursorSel', i === idx));
+      if (onMove) onMove(idx, cols, rowsTotal);
     }
     highlight();
     const kh = (e) => {
@@ -632,7 +676,13 @@
       if (!isFinite(minDistSeen)) return 0; // no projectiles ever got close
       return clamp01(1 - (minDistSeen - COLLISION_R) / (SAFE_R - COLLISION_R));
     }
-    return { init, cleanup, getDanger, get onTimeoutSuccess() { return true; } };
+    // Phase 4: live position for other players' ghost markers. Reported as
+    // 0-1 fractions of the arena so it's meaningful on any screen size.
+    function getPeerState() {
+      if (!w || !h) return null;
+      return { x: (px+17)/w, y: (py+17)/h };
+    }
+    return { init, cleanup, getDanger, getPeerState, get onTimeoutSuccess() { return true; } };
   }
 
   function typeGame() {
@@ -753,10 +803,11 @@
   }
 
   function spotDiffGame() {
-    let container, onResult, done, detachNav;
+    let container, onResult, done, detachNav, curFrac;
     function init(c, duration, cb, level) {
       container = c; onResult = cb; done = false;
       level = level || 1;
+      curFrac = null;
       const cells = 49;
       const baseHue = Math.floor(rand(0,360));
       const baseSat = 55, baseLight = 52;
@@ -788,10 +839,15 @@
         if (done) return; done = true;
         onResult(i === diffIdx);
       }
-      detachNav = attachArrowGridNav(cellEls, 7, select);
+      detachNav = attachArrowGridNav(cellEls, 7, select, (idx, cols, rowsTotal) => {
+        const row = Math.floor(idx/cols), col = idx%cols;
+        curFrac = { x: (col+0.5)/cols, y: (row+0.5)/rowsTotal };
+      });
     }
     function cleanup() { done = true; if (detachNav) detachNav(); }
-    return { init, cleanup };
+    // Phase 4: cursor cell position as a 0-1 fraction of the grid.
+    function getPeerState() { return curFrac; }
+    return { init, cleanup, getPeerState };
   }
 
   function stopBarGame() {
@@ -1109,10 +1165,10 @@
   const commands = ['CLICK!','DODGE!','TYPE!','MASH!','RESIST!','SPOT IT!'];
   const microgamePool = [
     { name:'click', factory: colorClickGame, cmd:'CLICK!', baseDuration: 4.6, shrinkRate: 0.34, minDuration: 0.9 },
-    { name:'dodge', factory: dodgeGame, cmd:'DODGE!', baseDuration: 4.4, noShrink: true },
+    { name:'dodge', factory: dodgeGame, cmd:'DODGE!', baseDuration: 4.4, noShrink: true, livePositions: true },
     { name:'type', factory: typeGame, cmd:'TYPE!', baseDuration: 5.57, shrinkRate: 0.2, minDuration: 1.87 },
     { name:'mash', factory: mashGame, cmd:'MASH!', baseDuration: 3.6, shrinkRate: 0.11, minDuration: 1.6 },
-    { name:'spot', factory: spotDiffGame, cmd:'SPOT IT!', baseDuration: 5.5, shrinkRate: 0.15, minDuration: 2.6 },
+    { name:'spot', factory: spotDiffGame, cmd:'SPOT IT!', baseDuration: 5.5, shrinkRate: 0.15, minDuration: 2.6, livePositions: true },
     { name:'reaction', factory: reactionArrowGame, cmd:'REACT!', baseDuration: 1.9, shrinkRate: 0.06, minDuration: 0.9 },
     { name:'stopbar', factory: stopBarGame, cmd:'STOP IT!', baseDuration: 4.0, hideTimer: true,
       getDuration: (level, container) => {
@@ -1188,23 +1244,30 @@
   let lobbyInterval = null;
   let currentRoomSeed = null;
 
-  // ---------- FIXED-DURATION ROUND SCHEDULE (synced-seed play) ----------
-  // Round N always occupies the same absolute wall-clock slot on every
-  // machine playing the same room: [roomStartTime + sum of previous slot
-  // lengths, ... + this round's slot length]. A slot is the command slam
-  // (COMMAND_SLAM_MS), the microgame's own duration, then the result pause
-  // (RESULT_PAUSE_MS). Winning or losing early no longer advances early --
-  // handleRoundEnd waits out whatever is left of the scheduled slot before
-  // calling nextRound(), so both clients stay on the same round at the same
-  // time regardless of how quickly either of them wins or loses.
+  // ---------- ROUND TIMING CONSTANTS ----------
+  // COMMAND_SLAM_MS/RESULT_PAUSE_MS still control the local command-slam and
+  // result-banner pacing for every round (solo or room). What they no
+  // longer do (Phase 3) is gate when a room match advances: that used to be
+  // a fixed worst-case wall-clock slot every client waited out regardless
+  // of how quickly they finished; now each client reports round_done the
+  // instant it resolves and waits for the server's advance_round instead,
+  // so a synced match moves as fast as its slowest player each round, not
+  // as slow as a fixed upper bound.
   const COMMAND_SLAM_MS = 420;
   const RESULT_PAUSE_MS = 550;
-  let roundScheduledStart = null; // absolute Date.now()-based ms, seeded play only
-  let roundScheduledEnd = null;   // absolute Date.now()-based ms for the round in progress
 
   // ---------- MATCH HISTORY (for the end-of-match summary/compare) ----------
   let isRoomMatch = false;
   let matchHistory = []; // [{round, name, cmd, level, success}, ...]
+
+  // ---------- PHASE 3: ROUND-END SYNC STATE ----------
+  // The round index (0-based, matches seededPlan order) this client is
+  // currently playing or waiting on a report for. Sent with round_done so
+  // the server can group reports correctly even if messages arrive out of
+  // order relative to other players.
+  let activeRoundIndex = null;
+  let awaitingAdvance = false;
+  let matchEnded = false;
 
   function buildRoomLink(seedValue, startTimeMs, lvl) {
     const url = new URL(window.location.href);
@@ -1228,53 +1291,303 @@
     centerMenu.style.display = 'none';
     roomDiffMenu.style.display = 'flex';
   }
+
+  // ---------- PHASE 1: SERVER ROOM CONNECTION ----------
+  // Replaces the old "build a link" flow. The host/joiner connects to the
+  // room server over WebSocket, creates or joins a 4-letter-code room, and
+  // both sides render the same live player list from room_update broadcasts.
+  // No gameplay sync yet -- generateRoundPlan/enterLobby aren't wired to
+  // this yet, that's a later phase.
+  const ROOM_SERVER_URL = 'wss://YOUR-RENDER-APP.onrender.com'; // TODO: set after Render deploy
+
+  let roomSocket = null;
+  let myClientId = null;
+  let roomPlayerNames = new Map(); // clientId -> name, kept fresh off room_update
+
+  // ---------- PHASE 4: LIVE MINIGAME VISIBILITY ----------
+  // Ghost markers for other players' positions during eligible minigames
+  // (dodge, spot). Client streams its own normalized position at a fixed
+  // interval; server just relays it; we render everyone else's latest
+  // reported position with light interpolation to smooth network jitter.
+  const PEER_SEND_INTERVAL_MS = 80;
+  const PEER_STALE_MS = 600; // drop a ghost if nothing's arrived in this long
+  let peerLayerEl = null;
+  let peerSendTimer = null;
+  let peerRenderRaf = null;
+  const peerStates = new Map(); // clientId -> { x, y, targetX, targetY, lastUpdate, el }
+
+  function peerColor(clientId) {
+    let hash = 0;
+    for (let i = 0; i < clientId.length; i++) hash = (hash*31 + clientId.charCodeAt(i)) | 0;
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 85%, 62%)`;
+  }
+
+  function ensurePeerLayer() {
+    if (peerLayerEl && stage.contains(peerLayerEl)) return peerLayerEl;
+    peerLayerEl = document.createElement('div');
+    peerLayerEl.id = 'peerLayer';
+    stage.appendChild(peerLayerEl);
+    return peerLayerEl;
+  }
+
+  function startPeerStreaming(game, roundIndex) {
+    stopPeerStreaming();
+    ensurePeerLayer();
+    peerSendTimer = setInterval(() => {
+      if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) return;
+      const s = game.getPeerState && game.getPeerState();
+      if (!s) return;
+      roomSocket.send(JSON.stringify({ type: 'peer_pos', roundIndex, x: s.x, y: s.y, state: s.state }));
+    }, PEER_SEND_INTERVAL_MS);
+
+    function renderTick() {
+      const now = performance.now();
+      for (const [clientId, p] of peerStates) {
+        if (now - p.lastUpdate > PEER_STALE_MS) {
+          if (p.el) p.el.style.opacity = '0';
+          continue;
+        }
+        // Simple exponential smoothing toward the latest received sample --
+        // enough to hide the gaps between 80ms updates without adding
+        // perceptible lag.
+        p.x += (p.targetX - p.x) * 0.25;
+        p.y += (p.targetY - p.y) * 0.25;
+        if (p.el && stage.contains(p.el)) {
+          p.el.style.opacity = '1';
+          p.el.style.left = (p.x * stage.clientWidth) + 'px';
+          p.el.style.top = (p.y * stage.clientHeight) + 'px';
+        }
+      }
+      peerRenderRaf = requestAnimationFrame(renderTick);
+    }
+    peerRenderRaf = requestAnimationFrame(renderTick);
+  }
+
+  function stopPeerStreaming() {
+    if (peerSendTimer) { clearInterval(peerSendTimer); peerSendTimer = null; }
+    if (peerRenderRaf) { cancelAnimationFrame(peerRenderRaf); peerRenderRaf = null; }
+    peerStates.clear();
+    peerLayerEl = null; // stage.innerHTML = '' between rounds already discards the old element
+  }
+
+  function handlePeerPos(msg) {
+    if (!isRoomMatch) return;
+    if (msg.roundIndex !== activeRoundIndex) return; // stale, for a round we've left
+    if (msg.x == null || msg.y == null) return;
+    let p = peerStates.get(msg.clientId);
+    if (!p) {
+      const layer = ensurePeerLayer();
+      const el = document.createElement('div');
+      el.className = 'peerGhost';
+      el.style.borderColor = peerColor(msg.clientId);
+      const label = document.createElement('div');
+      label.className = 'peerLabel';
+      label.textContent = roomPlayerNames.get(msg.clientId) || 'Player';
+      el.appendChild(label);
+      layer.appendChild(el);
+      p = { x: msg.x, y: msg.y, targetX: msg.x, targetY: msg.y, lastUpdate: performance.now(), el };
+      peerStates.set(msg.clientId, p);
+    }
+    p.targetX = msg.x; p.targetY = msg.y; p.lastUpdate = performance.now();
+  }
+
+  function roomCodeMenuShow() {
+    [centerMenu, difficultyMenu, roomDiffMenu, joinCodeMenu].forEach(el => el.style.display = 'none');
+    roomCodeMenu.style.display = 'flex';
+  }
+
+  function renderPlayerList(players, hostId) {
+    roomPlayerList.innerHTML = '';
+    players.forEach(p => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background:#1c1c1c; border-radius:6px; padding:8px 12px; display:flex; justify-content:space-between; color:#eee; font-size:14px;';
+      const label = document.createElement('span');
+      label.textContent = p.name + (p.id === myClientId ? ' (you)' : '');
+      row.appendChild(label);
+      if (p.id === hostId) {
+        const tag = document.createElement('span');
+        tag.textContent = 'HOST';
+        tag.style.cssText = 'color:#ffd23f; font-weight:900; font-size:11px;';
+        row.appendChild(tag);
+      }
+      roomPlayerList.appendChild(row);
+    });
+  }
+
+  function connectRoomSocket(onOpen) {
+    if (roomSocket && roomSocket.readyState === WebSocket.OPEN) { onOpen(); return; }
+    if (roomSocket) { try { roomSocket.close(); } catch (e) {} }
+    roomSocket = new WebSocket(ROOM_SERVER_URL);
+    roomSocket.addEventListener('open', onOpen);
+    roomSocket.addEventListener('message', (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch (e) { return; }
+      handleRoomMessage(msg);
+    });
+    roomSocket.addEventListener('close', () => { roomSocket = null; });
+    roomSocket.addEventListener('error', () => {
+      joinCodeError.textContent = 'Could not reach the room server.';
+    });
+  }
+
+  function handleRoomMessage(msg) {
+    switch (msg.type) {
+      case 'room_created':
+      case 'room_joined':
+        myClientId = msg.clientId;
+        roomCodeDisplay.textContent = msg.roomCode;
+        roomCodeMenuShow();
+        break;
+      case 'room_update':
+        roomCodeDisplay.textContent = msg.roomCode;
+        currentHostId = msg.hostId;
+        roomPlayerNames = new Map(msg.players.map(p => [p.id, p.name]));
+        renderPlayerList(msg.players, msg.hostId);
+        {
+          const amHost = myClientId === msg.hostId;
+          roomStartMatchBtn.style.display = amHost ? 'block' : 'none';
+          roomStartMatchBtn.disabled = false;
+          roomWaitingNote.style.display = amHost ? 'none' : 'block';
+        }
+        break;
+      case 'match_starting': {
+        // Basic clock-skew correction: shift the server's absolute startAt
+        // by the difference between the server's clock and ours, measured
+        // at the moment this message arrived.
+        const clockOffset = msg.serverTime - Date.now();
+        const localStartAt = msg.startAt - clockOffset;
+        beginRoomMatch(msg.seed, localStartAt, msg.level);
+        break;
+      }
+      case 'progress_update': {
+        if (!awaitingAdvance || matchEnded) break;
+        if (msg.roundIndex !== activeRoundIndex) break; // stale, for a round we've already left
+        roundWaitStatus.textContent = 'Waiting for other players... ' + msg.done + ' of ' + msg.total + ' done';
+        roundWaitStatus.style.display = 'block';
+        break;
+      }
+      case 'advance_round': {
+        if (matchEnded) break;
+        if (msg.roundIndex !== activeRoundIndex) break; // not the round we're waiting on
+        awaitingAdvance = false;
+        roundWaitStatus.style.display = 'none';
+        nextRound();
+        break;
+      }
+      case 'peer_pos':
+        handlePeerPos(msg);
+        break;
+      case 'join_error':
+        joinCodeError.textContent = msg.reason === 'not_found'
+          ? 'No room found with that code.'
+          : 'Could not join that room.';
+        break;
+      default:
+        break;
+    }
+  }
+
   function createRoom(lvl) {
     roomDiffMenu.style.display = 'none';
-    const seedValue = makeRoomSeed();
-    // Give whoever's sending the link a couple minutes to actually send it
-    // and have the other person open it before the countdown runs out.
-    const startTimeMs = Date.now() + 120000;
-    roomLinkText.value = buildRoomLink(seedValue, startTimeMs, lvl);
-    roomLinkMenu.style.display = 'flex';
-    roomLinkMenu.dataset.seed = seedValue;
-    roomLinkMenu.dataset.start = String(startTimeMs);
-    roomLinkMenu.dataset.lvl = String(lvl);
+    connectRoomSocket(() => {
+      roomSocket.send(JSON.stringify({ type: 'create_room', level: lvl, name: 'Host' }));
+    });
   }
 
-  function lobbyTick() {
-    const msLeft = roomStartTime - Date.now();
-    if (msLeft <= 0) {
-      if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
-      lobbyScreen.style.display = 'none';
-      startGame(roomStartLevelChosen);
+  function submitJoinCode() {
+    const code = joinCodeInput.value.trim().toUpperCase();
+    joinCodeError.textContent = '';
+    if (code.length !== 4) {
+      joinCodeError.textContent = 'Enter the 4-letter code.';
       return;
     }
-    lobbyCountdown.textContent = (msLeft / 1000).toFixed(1) + 's';
+    connectRoomSocket(() => {
+      roomSocket.send(JSON.stringify({ type: 'join_room', roomCode: code, name: 'Player' }));
+    });
   }
 
-  function enterLobby(seedValue, startTimeMs, lvl) {
-    [centerMenu, difficultyMenu, roomDiffMenu, roomLinkMenu].forEach(el => el.style.display = 'none');
+  function leaveRoomServer() {
+    if (roomSocket) {
+      try { roomSocket.send(JSON.stringify({ type: 'leave_room' })); } catch (e) {}
+      try { roomSocket.close(); } catch (e) {}
+      roomSocket = null;
+    }
+    if (countdownRaf) { cancelAnimationFrame(countdownRaf); countdownRaf = null; }
+    matchCountdownOverlay.style.display = 'none';
+    myClientId = null;
+    currentHostId = null;
+    roomCodeMenu.style.display = 'none';
+    centerMenu.style.display = 'flex';
+  }
+
+  // ---------- PHASE 2: SYNCED START ----------
+  // Host clicks START MATCH -> server broadcasts match_starting with a
+  // shared serverTime + startAt (~3000ms out) -> every client (host
+  // included) runs its own 3-2-1 overlay timed off that shared timestamp,
+  // then all call startGame() at the same instant. Basic clock-skew
+  // handling: each client compares the server's serverTime to its own
+  // Date.now() at message-receipt and shifts startAt by that offset.
+  let countdownRaf = null;
+  let currentHostId = null;
+
+  const COUNTDOWN_NUMBERS = ['3', '2', '1', 'GO!'];
+
+  function playCountdownStep(text) {
+    matchCountdownText.textContent = text;
+    matchCountdownText.style.animation = 'none';
+    // Force reflow so the animation restarts on repeated identical text (e.g. re-entrant calls).
+    void matchCountdownText.offsetWidth;
+    matchCountdownText.style.animation = 'slamIn 0.32s cubic-bezier(.2,1.4,.4,1) forwards';
+  }
+
+  function runMatchCountdown(localStartAtMs, level) {
+    [centerMenu, difficultyMenu, roomDiffMenu, roomCodeMenu, joinCodeMenu].forEach(el => el.style.display = 'none');
+    matchCountdownOverlay.style.display = 'flex';
+
+    let lastShown = null;
+    function tick() {
+      const msLeft = localStartAtMs - Date.now();
+      // Each step owns one second: 3 while msLeft>2000, 2 while >1000,
+      // 1 while >0, then GO! once the shared start instant has passed.
+      let label;
+      if (msLeft > 2000) label = '3';
+      else if (msLeft > 1000) label = '2';
+      else if (msLeft > 0) label = '1';
+      else label = 'GO!';
+
+      if (label !== lastShown) {
+        lastShown = label;
+        playCountdownStep(label);
+      }
+
+      if (msLeft <= 0) {
+        matchCountdownOverlay.style.display = 'none';
+        startGame(level);
+        return;
+      }
+      countdownRaf = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function beginRoomMatch(seedValue, startAtMs, lvl) {
     seededPlan = generateRoundPlan(seedValue, 200, lvl);
     seededRoundIdx = 0;
     currentRoomSeed = seedValue;
-    roomStartTime = startTimeMs;
+    roomStartTime = startAtMs; // used only to time the pre-match 3-2-1 countdown now
     roomStartLevelChosen = lvl;
-    lobbyScreen.style.display = 'flex';
-    lobbyTick();
-    lobbyInterval = setInterval(lobbyTick, 100);
+    runMatchCountdown(startAtMs, lvl);
   }
 
   function leaveRoom() {
-    if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
+    if (countdownRaf) { cancelAnimationFrame(countdownRaf); countdownRaf = null; }
+    stopPeerStreaming();
+    matchCountdownOverlay.style.display = 'none';
     seededPlan = null;
     seededRoundIdx = 0;
     currentRoomSeed = null;
-    lobbyScreen.style.display = 'none';
     matchSummaryScreen.style.display = 'none';
-    // Drop the room params so a refresh/back doesn't drop you right back in.
-    const url = new URL(window.location.href);
-    url.search = '';
-    window.history.replaceState({}, '', url.toString());
     centerMenu.style.display = 'flex';
   }
 
@@ -1286,43 +1599,25 @@
     roomDiffMenu.style.display = 'none';
     centerMenu.style.display = 'flex';
   });
-  roomCopyBtn.addEventListener('click', () => {
-    roomLinkText.select();
-    navigator.clipboard?.writeText(roomLinkText.value).catch(() => {});
-    roomCopyBtn.textContent = 'COPIED!';
-    setTimeout(() => { roomCopyBtn.textContent = 'COPY LINK'; }, 1200);
+  joinRoomBtn.addEventListener('click', () => {
+    centerMenu.style.display = 'none';
+    joinCodeInput.value = '';
+    joinCodeError.textContent = '';
+    joinCodeMenu.style.display = 'flex';
   });
-  roomEnterLobbyBtn.addEventListener('click', () => {
-    enterLobby(roomLinkMenu.dataset.seed, Number(roomLinkMenu.dataset.start), Number(roomLinkMenu.dataset.lvl));
-  });
-  roomLinkBackBtn.addEventListener('click', () => {
-    roomLinkMenu.style.display = 'none';
+  joinCodeSubmitBtn.addEventListener('click', submitJoinCode);
+  joinCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitJoinCode(); });
+  joinCodeBackBtn.addEventListener('click', () => {
+    joinCodeMenu.style.display = 'none';
     centerMenu.style.display = 'flex';
   });
-  lobbyLeaveBtn.addEventListener('click', leaveRoom);
-  lobbyMinus15Btn.addEventListener('click', () => {
-    if (roomStartTime == null) return;
-    // Purely local: this doesn't tell the other machine anything. It stays
-    // "synced" only because subtracting the same fixed 15s from the same
-    // shared roomStartTime keeps both machines' targets equal to each other
-    // -- as long as both players press it the same number of times. There's
-    // no way to enforce that without a server, so it's on the players to
-    // agree out loud.
-    roomStartTime -= 15000;
-    lobbyTick();
+  roomCodeLeaveBtn.addEventListener('click', leaveRoomServer);
+  roomStartMatchBtn.addEventListener('click', () => {
+    if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) return;
+    roomStartMatchBtn.disabled = true;
+    roomSocket.send(JSON.stringify({ type: 'start_match' }));
   });
 
-  // If this page was opened via a room link, skip the menu entirely and go
-  // straight into the synced lobby using the params baked into the URL.
-  (function checkRoomParams() {
-    const params = new URLSearchParams(window.location.search);
-    const seedParam = params.get('seed');
-    const startParam = params.get('start');
-    if (seedParam && startParam) {
-      const lvl = Math.max(1, Math.min(20, parseInt(params.get('lvl'), 10) || 1));
-      enterLobby(seedParam, parseInt(startParam, 10), lvl);
-    }
-  })();
 
   // ---------- TEST MODE ----------
   function buildTestMenu() {
@@ -1640,11 +1935,10 @@
     lives = 3; level = startLevel; streak = 0;
     isRoomMatch = !!seededPlan;
     matchHistory = [];
-    // Anchor the fixed-duration schedule to the same absolute moment every
-    // synced machine starts its match at (roomStartTime), so round slots
-    // line up even though nothing is actually communicating live.
-    roundScheduledStart = isRoomMatch ? roomStartTime : null;
-    roundScheduledEnd = null;
+    activeRoundIndex = null;
+    awaitingAdvance = false;
+    matchEnded = false;
+    roundWaitStatus.style.display = 'none';
     centerMenu.style.display = 'none';
     hud.style.display = 'flex';
     timerWrap.style.display = 'block';
@@ -1654,6 +1948,9 @@
   }
 
   function endGame() {
+    matchEnded = true;
+    awaitingAdvance = false;
+    roundWaitStatus.style.display = 'none';
     hud.style.display = 'none';
     timerWrap.style.display = 'none';
     stage.innerHTML = '';
@@ -1828,14 +2125,13 @@
     levelLabel.textContent = 'LEVEL ' + level;
     const duration = computeDuration(entry, level, stage);
 
-    // For room matches, this round's whole slot (slam + play + result pause)
-    // is pinned to the same absolute wall-clock window on every machine,
-    // anchored at roundScheduledStart (which starts at roomStartTime and
-    // advances by one full slot each round in handleRoundEnd).
-    if (isRoomMatch) {
-      const slotMs = COMMAND_SLAM_MS + duration*1000 + RESULT_PAUSE_MS;
-      roundScheduledEnd = roundScheduledStart + slotMs;
-    }
+    // Phase 3: rounds now advance on a live "everyone's reported in"
+    // handshake with the server instead of a fixed worst-case wall-clock
+    // slot, so there's no schedule to pin here anymore -- just remember
+    // which round (by deterministic plan index) this one is, so the
+    // round_done report and any advance_round we get back can be matched
+    // up correctly.
+    if (isRoomMatch) activeRoundIndex = seededRoundIdx - 1;
 
     // command slam
     commandOverlay.style.display = 'flex';
@@ -1863,7 +2159,14 @@
     }
 
     game.init(stage, duration, onResult, level);
-    currentCleanup = () => game.cleanup();
+    currentCleanup = () => { game.cleanup(); stopPeerStreaming(); };
+
+    // Phase 4: only stream/render live positions for minigames flagged
+    // livePositions, and only in an actual room match -- solo play has no
+    // one else to show.
+    if (isRoomMatch && entry.livePositions && game.getPeerState) {
+      startPeerStreaming(game, activeRoundIndex);
+    }
 
     timerWrap.style.display = entry.hideTimer ? 'none' : 'block';
 
@@ -1897,6 +2200,7 @@
 
   function handleRoundEnd(success, game) {
     try { game.cleanup(); } catch(e){}
+    stopPeerStreaming();
     currentCleanup = null;
 
     if (activeEntry) {
@@ -1909,31 +2213,55 @@
     doFlash();
     if (!success) vibScreen();
 
-    // Early wins/losses don't get to skip ahead: for room matches, wait out
-    // whatever's left of this round's scheduled slot (at least the normal
-    // result pause) before advancing, so both machines stay locked to the
-    // same round at the same time no matter how quickly either one resolved.
-    const wait = isRoomMatch
-      ? Math.max(RESULT_PAUSE_MS, roundScheduledEnd - Date.now())
-      : RESULT_PAUSE_MS;
+    if (success) {
+      streak++;
+      if (streak % 10 === 0) showToast('SPEED UP! x' + streak);
+    } else {
+      lives--;
+      updateLivesUI();
+    }
+    const outOfLives = lives <= 0;
 
+    if (isRoomMatch) {
+      // Phase 3: no more waiting out a fixed worst-case slot. Report in the
+      // instant this round resolves, then either end (if out of lives) or
+      // show live "X of Y done" progress until the server says everyone's
+      // reported and it's time to advance together.
+      const thisRoundIndex = activeRoundIndex;
+      if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+        roomSocket.send(JSON.stringify({
+          type: 'round_done',
+          roundIndex: thisRoundIndex,
+          success,
+          finished: outOfLives,
+        }));
+      }
+
+      if (outOfLives) {
+        setTimeout(() => {
+          resultBanner.classList.remove('show');
+          endGame();
+        }, RESULT_PAUSE_MS);
+      } else {
+        awaitingAdvance = true;
+        setTimeout(() => {
+          resultBanner.classList.remove('show');
+          roundWaitStatus.textContent = 'Waiting for other players...';
+          roundWaitStatus.style.display = 'block';
+        }, RESULT_PAUSE_MS);
+      }
+      return;
+    }
+
+    // Solo play: unchanged, brief pause then straight into the next round.
     setTimeout(() => {
       resultBanner.classList.remove('show');
-      if (isRoomMatch) roundScheduledStart = roundScheduledEnd;
-      if (success) {
-        streak++;
-        if (streak % 10 === 0) showToast('SPEED UP! x' + streak);
-        nextRound();
+      if (outOfLives) {
+        setTimeout(endGame, 200);
       } else {
-        lives--;
-        updateLivesUI();
-        if (lives <= 0) {
-          setTimeout(endGame, 200);
-        } else {
-          nextRound();
-        }
+        nextRound();
       }
-    }, wait);
+    }, RESULT_PAUSE_MS);
   }
 
   startBtn.addEventListener('click', () => {
