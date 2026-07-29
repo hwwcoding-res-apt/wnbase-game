@@ -304,12 +304,11 @@ wss.on('connection', (ws) => {
       }
 
       case 'chaos_toggle': {
-        // Host-triggered, guest-only effect. Only the room's current host
-        // may trigger it; the server doesn't track chaos state itself, it
-        // just relays the toggle to everyone else in the room.
+        // Either player can trigger this on the other -- the server doesn't
+        // track chaos state itself, it just relays the toggle to everyone
+        // else currently in the room.
         const room = rooms.get(ws.roomCode);
         if (!room) return;
-        if (room.hostId !== ws.clientId) return; // only the host can trigger chaos
         if (typeof msg.which !== 'string') return;
 
         broadcastRoomExcept(ws.roomCode, ws.clientId, {
