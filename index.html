@@ -559,6 +559,65 @@
   function pick(arr) { return arr[Math.floor(rngFn() * arr.length)]; }
   function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
+  // ---------- SFX (synthesized via Web Audio, no asset files) ----------
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { return null; }
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return audioCtx;
+  }
+  // Autoplay policies require a user gesture before audio can play -- grab
+  // the very first pointer/key interaction on the page to unlock/create the
+  // context, so later sfx calls (which often fire from setTimeout/rAF, not
+  // directly inside a click handler) aren't silently blocked.
+  ['pointerdown', 'keydown'].forEach(evt => window.addEventListener(evt, () => getAudioCtx(), { once: true }));
+
+  function beep(freq, durationMs, opts) {
+    opts = opts || {};
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = opts.type || 'square';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (opts.freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.freqEnd), t0 + durationMs / 1000);
+    const vol = opts.volume != null ? opts.volume : 0.18;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationMs / 1000);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + durationMs / 1000 + 0.02);
+  }
+
+  const sfx = {
+    command() {
+      beep(180, 130, { type: 'square', volume: 0.22 });
+      beep(90, 160, { type: 'square', volume: 0.16 });
+    },
+    success() {
+      beep(660, 90, { type: 'triangle', volume: 0.2 });
+      setTimeout(() => beep(990, 150, { type: 'triangle', volume: 0.2 }), 70);
+    },
+    fail() {
+      beep(160, 240, { type: 'sawtooth', volume: 0.22, freqEnd: 55 });
+    },
+    countdownTick() {
+      beep(440, 90, { type: 'square', volume: 0.15 });
+    },
+    countdownGo() {
+      beep(880, 220, { type: 'square', volume: 0.24 });
+    },
+    streak() {
+      beep(523, 80, { type: 'triangle', volume: 0.18 });
+      setTimeout(() => beep(784, 150, { type: 'triangle', volume: 0.18 }), 60);
+    },
+  };
+
   function vibScreen() {
     app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
   }
@@ -742,10 +801,10 @@
     function init(c, duration, cb, level) {
       container = c; onResult = cb; done = false; pct = 20;
       level = level || 1;
-      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">MASH ANYTHING, FAST!</div><div id="mashRival">RIVAL IS PULLING BACK!</div><div id="mashBarWrap"><div id="mashBarFill"></div></div>'
+      c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">MASH ARROW KEYS, FAST!</div><div id="mashRival">RIVAL IS PULLING BACK!</div><div id="mashBarWrap"><div id="mashBarFill"></div></div>'
         + '<div style="position:absolute; bottom:15%; left:50%; transform:translateX(-50%); display:flex; gap:16px;">'
         + '<div id="mashBtnLeft" class="mashSideBtn">◄</div><div id="mashBtnRight" class="mashSideBtn">►</div>'
-        + '</div></div>';
+        + '</div><div id="gridHint" style="bottom:8%;">ALTERNATE ← / → ARROW KEYS</div></div>';
       fill = c.querySelector('#mashBarFill');
       fill.style.width = pct + '%';
       const leftBtn = c.querySelector('#mashBtnLeft');
@@ -755,21 +814,25 @@
         fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
         fill.style.background = pct > 66 ? '#2ea043' : pct > 33 ? '#ffd23f' : '#d8324a';
       }
-      function press() {
+      // Each press fills roughly a sixth of the bar -- tuned so mashing at a
+      // steady clip clears it in around 6 presses, not 13+.
+      const PRESS_AMOUNT = 14;
+      function press(side) {
         if (done) return;
-        pct = Math.min(100, pct + 6);
+        pct = Math.min(100, pct + PRESS_AMOUNT);
         render();
+        const btn = side === 'left' ? leftBtn : side === 'right' ? rightBtn : null;
+        if (btn) { btn.style.transform = 'scale(0.94)'; setTimeout(() => { btn.style.transform = ''; }, 90); }
         if (pct >= 100) { done = true; onResult(true); }
       }
-      leftBtn.addEventListener('click', () => press());
-      rightBtn.addEventListener('click', () => press());
-      leftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); });
-      rightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); });
+      // Arrow-keys-only now: the on-screen buttons are visual indicators of
+      // the left/right alternation, not tappable -- keeps this one keyboard
+      // (or a hardware d-pad), unlike mouse/touch elsewhere in the pool.
       keyH = (e) => {
         if (e.type !== 'keydown' || e.repeat) return; // ignore OS auto-repeat from a held key
-        if (['Shift','Control','Alt','Meta','Tab','CapsLock','Escape'].includes(e.key)) return;
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
         e.preventDefault();
-        press();
+        press(e.key === 'ArrowLeft' ? 'left' : 'right');
       };
       window.addEventListener('keydown', keyH);
       keyHandler = keyH;
@@ -906,13 +969,12 @@
       zoneEl = c.querySelector('#gaugeZone');
       markerEl = c.querySelector('#gaugeMarker');
       w = gaugeEl.clientWidth;
-      speed = 220 + level*30;
-      // The old rule guaranteed a minimum *time* inside the zone by growing
-      // the zone with speed -- which meant at high level (high speed) the
-      // zone ballooned up to 40% of the track, making the game easier the
-      // faster the marker moved. Zone size is now purely level-based and
-      // only ever shrinks with level, independent of speed.
-      zoneWidth = Math.max(w*0.08, w*(0.24 - level*0.007));
+      speed = 220 + level*42;
+      // Zone size is purely level-based and only ever shrinks with level,
+      // independent of speed. Shrinks faster and bottoms out smaller than
+      // before, so high levels are a genuinely tighter window, not just a
+      // faster one.
+      zoneWidth = Math.max(w*0.05, w*(0.24 - level*0.012));
       zoneX = rand(0, w - zoneWidth);
       zoneEl.style.left = zoneX+'px';
       zoneEl.style.width = zoneWidth+'px';
@@ -935,13 +997,12 @@
         markerEl.style.left = pos+'px';
         const markerCenter = pos+4;
         const inZone = markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth;
-        // No timer, no timeout fail -- instead, the marker gets exactly two
-        // free passes through the zone. Miss your chance to click during a
-        // pass and it costs you one of those two; run out of passes and
-        // that's the fail, whether or not you were ever going to click.
+        // No timer, no timeout fail -- instead, the marker gets exactly one
+        // free pass through the zone. Miss your chance to click during that
+        // pass and it's an immediate fail; there's no second chance.
         if (wasInZone && !inZone) {
           passCount++;
-          if (passCount >= 2) { done = true; lastDanger = 1; cb(false); return; }
+          if (passCount >= 1) { done = true; lastDanger = 1; cb(false); return; }
         }
         wasInZone = inZone;
         raf = requestAnimationFrame(loop);
@@ -952,10 +1013,10 @@
         const markerCenter = pos+4;
         const inZone = markerCenter >= zoneX && markerCenter <= zoneX+zoneWidth;
         if (inZone) {
-          // Clicking during the very first pass is a clean win. Letting it
-          // go by once and catching it on the second pass still wins, but
-          // it's the riskier of the two -- you were one miss from a fail.
-          lastDanger = passCount >= 1 ? 0.5 : 0;
+          // With only one pass allowed, a successful click can only ever
+          // happen during that first (and only) pass -- if you missed it,
+          // the round already ended as a fail in the loop above.
+          lastDanger = 0;
           cb(true);
         } else {
           lastDanger = 1;
@@ -1440,7 +1501,9 @@
   function handlePeerPos(msg) {
     if (!isRoomMatch || matchEnded) return;
     if (msg.roundIndex !== activeRoundIndex) return; // stale, for a round we've left
-    if (msg.x == null || msg.y == null) return;
+    if (typeof msg.x !== 'number' || typeof msg.y !== 'number' || !isFinite(msg.x) || !isFinite(msg.y)) return;
+    msg.x = clamp01(msg.x);
+    msg.y = clamp01(msg.y);
     let p = peerStates.get(msg.clientId);
     if (!p) {
       const layer = ensurePeerLayer();
@@ -1682,6 +1745,7 @@
       if (label !== lastShown) {
         lastShown = label;
         playCountdownStep(label);
+        if (label === 'GO!') sfx.countdownGo(); else sfx.countdownTick();
       }
 
       if (msLeft <= 0) {
@@ -1814,6 +1878,7 @@
     commandText.className = '';
     void commandText.offsetWidth;
     commandText.className = 'slam';
+    sfx.command();
 
     setTimeout(() => {
       if (!testMode) return;
@@ -1830,6 +1895,7 @@
         resultText.className = success ? 'success-banner' : 'fail-banner';
         resultBanner.classList.add('show');
         doFlash();
+        if (success) sfx.success(); else sfx.fail();
         setTimeout(() => {
           resultBanner.classList.remove('show');
           if (testMode) runTestRound();
@@ -1955,6 +2021,7 @@
     commandText.className = '';
     void commandText.offsetWidth;
     commandText.className = 'slam';
+    sfx.command();
 
     setTimeout(() => {
       if (!balancingActive) return;
@@ -1985,6 +2052,7 @@
         resultText.className = success ? 'success-banner' : 'fail-banner';
         resultBanner.classList.add('show');
         doFlash();
+        if (success) sfx.success(); else sfx.fail();
         if (!success) vibScreen();
 
         balancingResults[balancingGameIdx].attempts.push({ pct, success });
@@ -2303,6 +2371,7 @@
     void commandText.offsetWidth;
     commandText.className = 'slam';
     vibScreen();
+    sfx.command();
 
     setTimeout(() => {
       commandOverlay.style.display = 'none';
@@ -2374,11 +2443,12 @@
     resultText.className = success ? 'success-banner' : 'fail-banner';
     resultBanner.classList.add('show');
     doFlash();
+    if (success) sfx.success(); else sfx.fail();
     if (!success) vibScreen();
 
     if (success) {
       streak++;
-      if (streak % 10 === 0) showToast('SPEED UP! x' + streak);
+      if (streak % 10 === 0) { showToast('SPEED UP! x' + streak); sfx.streak(); }
     } else {
       lives--;
       updateLivesUI();
