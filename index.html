@@ -972,12 +972,12 @@
       zoneEl = c.querySelector('#gaugeZone');
       markerEl = c.querySelector('#gaugeMarker');
       w = gaugeEl.clientWidth;
-      speed = 220 + level*42;
+      speed = (220 + level*42) / 1.5;
       // Zone size is purely level-based and only ever shrinks with level,
       // independent of speed. Shrinks faster and bottoms out smaller than
       // before, so high levels are a genuinely tighter window, not just a
       // faster one.
-      zoneWidth = Math.max(w*0.05, w*(0.24 - level*0.012));
+      zoneWidth = Math.max(w*0.05, w*(0.24 - level*0.012)) * 1.5;
       zoneX = rand(0, w - zoneWidth);
       zoneEl.style.left = zoneX+'px';
       zoneEl.style.width = zoneWidth+'px';
