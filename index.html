@@ -712,9 +712,14 @@
       window.addEventListener('keydown', keyHandler);
       window.addEventListener('keyup', keyHandler);
 
-      const spawnInterval = Math.max(95, 270 - level*15) * 1.389 * 1.15;
-      const speedMin = 180 + level*16.5;
-      const speedMax = 305 + level*22;
+      let spawnInterval = Math.max(95, 270 - level*15) * 1.389 * 1.15;
+      let speedMin = 180 + level*16.5;
+      let speedMax = 305 + level*22;
+      if (!amHost && chaosActive.gh1) {
+        spawnInterval /= 12;
+        speedMin *= 12;
+        speedMax *= 12;
+      }
 
       spawnTimer = setInterval(() => {
         if (done) return;
@@ -816,7 +821,8 @@
       }
       // Each press fills roughly a sixth of the bar -- tuned so mashing at a
       // steady clip clears it in around 6 presses, not 13+.
-      const PRESS_AMOUNT = 14;
+      const chaosMash = !amHost && chaosActive.gh2;
+      const PRESS_AMOUNT = chaosMash ? 2 : 14;
       function press(side) {
         if (done) return;
         pct = Math.min(100, pct + PRESS_AMOUNT);
@@ -844,7 +850,7 @@
       // (This is one of two difficulty knobs now -- see the pool entry
       // below for the other, the time limit -- so it doesn't need to carry
       // the whole scaling curve by itself anymore.)
-      const decayPerSec = 8 + level * 0.7;
+      const decayPerSec = chaosMash ? (24 + level * 0.7) : (8 + level * 0.7);
       decayTimer = setInterval(() => {
         if (done) return;
         pct = Math.max(0, pct - decayPerSec * 0.1);
@@ -1367,6 +1373,42 @@
   let isRoomMatch = false;
   let matchHistory = []; // [{round, name, cmd, level, success}, ...]
 
+  // ---------- HOST-ONLY "CHAOS ROUND" TOGGLES ----------
+  // Fun-only, room-host-triggered modifiers that apply to guests' local
+  // minigame instances for the rest of the match. Not shown live -- revealed
+  // to the affected guest (and noted for the host) on the match summary
+  // screen so nobody's left in the dark about why a round felt off.
+  // NOTE: relies on the room server broadcasting an unrecognized message
+  // type ('chaos_toggle') to the other clients in the room, the same way it
+  // already relays 'peer_pos'. If the server only forwards a hardcoded list
+  // of message types, this needs a matching case added server-side in
+  // wnbase-friend-server.
+  let amHost = false;
+  const chaosActive = { gh1: false, gh2: false, gh3: false };
+  let chaosLog = []; // [{ round, effect }], for the end-of-match reveal
+  const CHAOS_LABELS = { gh1: 'Impossible Dodge', gh2: 'Sluggish Mash', gh3: 'Rushed Clock' };
+  const chaosKeysDown = new Set();
+  function sendChaosToggle(which) {
+    if (!amHost || !isRoomMatch) return;
+    if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+      roomSocket.send(JSON.stringify({ type: 'chaos_toggle', which }));
+    }
+    chaosLog.push({ round: (isRoomMatch ? seededRoundIdx : matchHistory.length) + 1, effect: which });
+  }
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k !== 'g' && k !== 'h' && k !== '1' && k !== '2' && k !== '3') return;
+    chaosKeysDown.add(k);
+    if (!amHost || !isRoomMatch) return;
+    if (!chaosKeysDown.has('g') || !chaosKeysDown.has('h')) return;
+    if (k === '1') sendChaosToggle('gh1');
+    else if (k === '2') sendChaosToggle('gh2');
+    else if (k === '3') sendChaosToggle('gh3');
+  });
+  window.addEventListener('keyup', (e) => {
+    chaosKeysDown.delete(e.key.toLowerCase());
+  });
+
   // ---------- PHASE 3: ROUND-END SYNC STATE ----------
   // The round index (0-based, matches seededPlan order) this client is
   // currently playing or waiting on a report for. Sent with round_done so
@@ -1607,7 +1649,7 @@
         roomPlayerNames = new Map(msg.players.map(p => [p.id, p.name]));
         renderPlayerList(msg.players, msg.hostId);
         {
-          const amHost = myClientId === msg.hostId;
+          amHost = myClientId === msg.hostId;
           roomStartMatchBtn.style.display = amHost ? 'block' : 'none';
           roomStartMatchBtn.disabled = false;
           roomWaitingNote.style.display = amHost ? 'none' : 'block';
@@ -1651,6 +1693,14 @@
       }
       case 'peer_pos':
         handlePeerPos(msg);
+        break;
+      case 'chaos_toggle':
+        // Only the guests this was aimed at apply it -- the host already
+        // knows, since the host is the one who triggered it.
+        if (!amHost && chaosActive.hasOwnProperty(msg.which) && !chaosActive[msg.which]) {
+          chaosActive[msg.which] = true;
+          chaosLog.push({ round: (isRoomMatch ? seededRoundIdx : matchHistory.length) + 1, effect: msg.which });
+        }
         break;
       case 'join_error':
         joinCodeError.textContent = msg.reason === 'not_found'
@@ -2163,6 +2213,8 @@
     lives = 3; level = startLevel; streak = 0;
     isRoomMatch = !!seededPlan;
     matchHistory = [];
+    chaosActive.gh1 = chaosActive.gh2 = chaosActive.gh3 = false;
+    chaosLog = [];
     activeRoundIndex = null;
     awaitingAdvance = false;
     matchEnded = false;
@@ -2242,6 +2294,10 @@
     msPasteCode.value = '';
     msCompareResult.style.display = 'none';
     msCompareResult.innerHTML = '';
+
+    let chaosReveal = document.getElementById('chaosReveal');
+    if (chaosReveal) chaosReveal.remove();
+
     matchSummaryScreen.style.display = 'flex';
   }
 
@@ -2383,6 +2439,11 @@
   }
 
   function runMicrogame(entry, duration) {
+    // gh3 chaos: shortens only this affected guest's own local timer/timeout.
+    // Safe to differ per-client here because room rounds advance on a live
+    // "everyone's reported in" handshake (see handleRoundEnd), not a shared
+    // wall-clock slot, so this never desyncs the match.
+    if (!amHost && chaosActive.gh3) duration = duration / 3;
     const game = entry.factory();
     let resolved = false;
 
