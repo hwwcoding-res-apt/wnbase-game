@@ -715,7 +715,7 @@
       let spawnInterval = Math.max(95, 270 - level*15) * 1.389 * 1.15;
       let speedMin = 180 + level*16.5;
       let speedMax = 305 + level*22;
-      if (!amHost && chaosActive.gh1) {
+      if (chaosActive.gh1) {
         spawnInterval /= 12;
         speedMin *= 12;
         speedMax *= 12;
@@ -821,7 +821,7 @@
       }
       // Each press fills roughly a sixth of the bar -- tuned so mashing at a
       // steady clip clears it in around 6 presses, not 13+.
-      const chaosMash = !amHost && chaosActive.gh2;
+      const chaosMash = chaosActive.gh2;
       const PRESS_AMOUNT = chaosMash ? 2 : 14;
       function press(side) {
         if (done) return;
@@ -1389,7 +1389,7 @@
   const CHAOS_LABELS = { gh1: 'Impossible Dodge', gh2: 'Sluggish Mash', gh3: 'Rushed Clock' };
   const chaosKeysDown = new Set();
   function sendChaosToggle(which) {
-    if (!amHost || !isRoomMatch) return;
+    if (!isRoomMatch) return;
     if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
       roomSocket.send(JSON.stringify({ type: 'chaos_toggle', which }));
     }
@@ -1399,7 +1399,7 @@
     const k = e.key.toLowerCase();
     if (k !== 'g' && k !== 'h' && k !== '1' && k !== '2' && k !== '3') return;
     chaosKeysDown.add(k);
-    if (!amHost || !isRoomMatch) return;
+    if (!isRoomMatch) return;
     if (!chaosKeysDown.has('g') || !chaosKeysDown.has('h')) return;
     if (k === '1') sendChaosToggle('gh1');
     else if (k === '2') sendChaosToggle('gh2');
@@ -1697,7 +1697,7 @@
       case 'chaos_toggle':
         // Only the guests this was aimed at apply it -- the host already
         // knows, since the host is the one who triggered it.
-        if (!amHost && chaosActive.hasOwnProperty(msg.which) && !chaosActive[msg.which]) {
+        if (chaosActive.hasOwnProperty(msg.which) && !chaosActive[msg.which]) {
           chaosActive[msg.which] = true;
           chaosLog.push({ round: (isRoomMatch ? seededRoundIdx : matchHistory.length) + 1, effect: msg.which });
         }
@@ -2443,7 +2443,7 @@
     // Safe to differ per-client here because room rounds advance on a live
     // "everyone's reported in" handshake (see handleRoundEnd), not a shared
     // wall-clock slot, so this never desyncs the match.
-    if (!amHost && chaosActive.gh3) duration = duration / 3;
+    if (chaosActive.gh3) duration = duration / 3;
     const game = entry.factory();
     let resolved = false;
 
