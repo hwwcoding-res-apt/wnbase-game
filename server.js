@@ -37,6 +37,41 @@ function makeClientId() {
 // match doesn't feel laggy.
 const START_COUNTDOWN_MS = 3000;
 
+// ---------- Room reaping ----------
+// Rooms should live only as long as a lobby+match reasonably takes. Anything
+// left over (host closed the tab without a clean disconnect, browser crash,
+// etc.) should eventually get swept so `rooms` doesn't grow forever.
+const ROOM_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+const ROOM_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // check every 10 min
+
+function sweepStaleRooms() {
+  const now = Date.now();
+  for (const [roomCode, room] of rooms) {
+    const stale = (now - room.createdAt) > ROOM_MAX_AGE_MS;
+    // Also reap rooms whose sockets have all silently died (readyState !== OPEN)
+    // even if a `close` event never fired for some reason.
+    const allDead = room.players.length > 0 && room.players.every(p => !p.ws || p.ws.readyState !== p.ws.OPEN);
+    if (stale || allDead) {
+      for (const p of room.players) {
+        if (p.ws && p.ws.readyState === p.ws.OPEN) {
+          try { p.ws.close(); } catch (e) { /* ignore */ }
+        }
+      }
+      rooms.delete(roomCode);
+    }
+  }
+}
+
+setInterval(sweepStaleRooms, ROOM_SWEEP_INTERVAL_MS).unref();
+
+// ---------- Per-connection rate limiting ----------
+// Cheap defense against a buggy or malicious client flooding the room with
+// messages (e.g. peer_pos spam). Not meant to be bulletproof -- just enough
+// that one bad client can't hammer the event loop or other players' sockets.
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_MESSAGES = 40; // generous headroom above the ~12.5/s peer_pos cadence
+const MAX_MESSAGE_BYTES = 4 * 1024; // 4KB is far more than any message here needs
+
 function makeSeed() {
   // Seed lives entirely server-side now (Phase 1 had the client generate
   // it). Doesn't need to be cryptographically strong -- just unique enough
@@ -150,8 +185,23 @@ const wss = new WebSocketServer({ server });
 wss.on('connection', (ws) => {
   ws.clientId = makeClientId();
   ws.roomCode = null;
+  ws._msgCount = 0;
+  ws._msgWindowStart = Date.now();
 
   ws.on('message', (raw) => {
+    // Payload size cap -- ignore anything oversized rather than letting a
+    // malformed/huge message through to JSON.parse or a broadcast.
+    if (raw.length > MAX_MESSAGE_BYTES) return;
+
+    // Sliding-window rate limit. Cheap and approximate on purpose.
+    const now = Date.now();
+    if (now - ws._msgWindowStart > RATE_LIMIT_WINDOW_MS) {
+      ws._msgWindowStart = now;
+      ws._msgCount = 0;
+    }
+    ws._msgCount++;
+    if (ws._msgCount > RATE_LIMIT_MAX_MESSAGES) return; // silently drop, don't disconnect for one burst
+
     let msg;
     try {
       msg = JSON.parse(raw);
