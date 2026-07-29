@@ -1055,7 +1055,7 @@
       // Cap length at 5 -- past level ~6 the challenge comes entirely from
       // flashSpeed (faster playback), not from asking you to remember more
       // items than a person actually can.
-      const len = Math.min(12, 3 + Math.floor(level/3));
+      const len = Math.min(100, 3 + Math.floor((level-1) * 97 / 19));
       sequence = Array.from({length: len}, () => Math.floor(rand(0,numColors)));
       playerIdx = 0;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS/WASD TO MOVE, SPACE TO PICK</div></div>';
