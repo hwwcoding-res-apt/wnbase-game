@@ -1046,7 +1046,6 @@
     function init(c, duration, cb, level) {
       done = false;
       level = level || 1;
-      const numColors = colors.length;
       // Sequence length used to cap at 5 by level 10 (3 + floor(level/5),
       // capped at 5) -- meaning levels 10-20+ were all functionally
       // identical in length, with only flashSpeed doing any scaling (and
@@ -1055,48 +1054,26 @@
       // Cap length at 5 -- past level ~6 the challenge comes entirely from
       // flashSpeed (faster playback), not from asking you to remember more
       // items than a person actually can.
-      const len = Math.min(100, 3 + Math.floor((level-1) * 97 / 19));
-      sequence = Array.from({length: len}, () => Math.floor(rand(0,numColors)));
+      const len = Math.min(5, 3 + Math.floor(level/3));
+      sequence = Array.from({length: len}, () => Math.floor(rand(0,4)));
       playerIdx = 0;
       c.innerHTML = '<div class="mg-wrap"><div class="mg-prompt">WATCH, THEN REPEAT!</div><div class="simonGrid" id="sg"></div><div id="gridHint">ARROWS/WASD TO MOVE, SPACE TO PICK</div></div>';
       const sg = c.querySelector('#sg');
-      const gridCols = 2;
-      sg.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
-      sg.style.gridTemplateRows = `repeat(${Math.ceil(numColors/gridCols)}, 1fr)`;
       tiles = colors.map((col,i) => {
         const t = document.createElement('div');
         t.className = 'simonTile';
         t.style.background = col;
         t.addEventListener('click', () => onTileClick(i));
-        const hint = document.createElement('span');
-        hint.className = 'sgHint';
-        hint.style.cssText = 'position:absolute;top:6px;right:6px;width:3px;height:3px;border-radius:50%;background:' + col + ';';
-        t.appendChild(hint);
         sg.appendChild(t);
         return t;
       });
-      detachNav = attachArrowGridNav(tiles, gridCols, onTileClick);
+      detachNav = attachArrowGridNav(tiles, 2, onTileClick);
       let accepting = false;
       let i = 0;
       const flashSpeed = Math.max(180, 545 - level*14);
-      function lighten(hex, amt) {
-        const n = parseInt(hex.slice(1), 16);
-        const r = Math.min(255, (n >> 16) + amt);
-        const g = Math.min(255, ((n >> 8) & 255) + amt);
-        const b = Math.min(255, (n & 255) + amt);
-        return `rgb(${r},${g},${b})`;
-      }
-      function updateHint() {
-        tiles.forEach((t, ti) => {
-          const hint = t.querySelector('.sgHint');
-          if (!hint) return;
-          const isTarget = accepting && !done && ti === sequence[playerIdx];
-          hint.style.background = isTarget ? lighten(colors[ti], 70) : colors[ti];
-        });
-      }
       function playStep() {
         if (done) return;
-        if (i >= sequence.length) { accepting = true; updateHint(); return; }
+        if (i >= sequence.length) { accepting = true; return; }
         const idx = sequence[i];
         tiles[idx].classList.add('lit');
         const numEl = document.createElement('span');
@@ -1125,8 +1102,7 @@
         }, 150);
         if (idx !== sequence[playerIdx]) { done = true; cb(false); return; }
         playerIdx++;
-        if (playerIdx >= sequence.length) { done = true; cb(true); return; }
-        updateHint();
+        if (playerIdx >= sequence.length) { done = true; cb(true); }
       }
     }
     function cleanup() { done = true; if (detachNav) detachNav(); }
@@ -1323,7 +1299,7 @@
         return Math.max(4, worstCaseSec + 1.5);
       }
     },
-    { name:'simon', factory: simonFlashGame, cmd:'REPEAT!', baseDuration: 20, noShrink: true },
+    { name:'simon', factory: simonFlashGame, cmd:'REPEAT!', baseDuration: 6.175, noShrink: true },
     { name:'balance', factory: balanceGame, cmd:'BALANCE!', baseDuration: 4.8, noShrink: true },
     { name:'reacttest', factory: trueReactionGame, cmd:'REACT!', baseDuration: 3.74, noShrink: true, hideTimer: true },
   ];
