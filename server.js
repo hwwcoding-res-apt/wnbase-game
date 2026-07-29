@@ -303,6 +303,22 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'chaos_toggle': {
+        // Host-triggered, guest-only effect. Only the room's current host
+        // may trigger it; the server doesn't track chaos state itself, it
+        // just relays the toggle to everyone else in the room.
+        const room = rooms.get(ws.roomCode);
+        if (!room) return;
+        if (room.hostId !== ws.clientId) return; // only the host can trigger chaos
+        if (typeof msg.which !== 'string') return;
+
+        broadcastRoomExcept(ws.roomCode, ws.clientId, {
+          type: 'chaos_toggle',
+          which: msg.which,
+        });
+        break;
+      }
+
       case 'peer_pos': {
         // Phase 4: live minigame visibility. Client streams its own
         // position/state during an eligible minigame; just relay it to
